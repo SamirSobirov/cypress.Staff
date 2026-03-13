@@ -1,16 +1,16 @@
-name: Staff CRUD Monitoring
+name: Staff Management CRUD Monitoring
 
 on:
   schedule:
-    - cron: '0 * * * *' # Каждый час
+    - cron: '0 * * * *'
   workflow_dispatch:
     inputs:
       user_chat_id:
-        description: 'ID для ручного запуска'
+        description: 'ID чата для личного ответа'
         required: false
 
 jobs:
-  test:
+  cypress-run:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -19,7 +19,6 @@ jobs:
       - name: Cypress run
         uses: cypress-io/github-action@v6
         with:
-          # Путь строго по твоей структуре папок
           spec: cypress/e2e/monitoring/staff_management.cy.js
           browser: chrome
         env:
@@ -27,39 +26,51 @@ jobs:
           CYPRESS_LOGIN_PASSWORD: ${{ secrets.LOGIN_PASSWORD }}
         continue-on-error: true
 
-      - name: Analyze Result
+      - name: Parse Diagnostic Data
         if: always()
-        id: status_check
+        id: parser
         run: |
+          # Считываем значение из файла
           if [ -f auth_api_status.txt ]; then
-            VAL=$(cat auth_api_status.txt)
-            if [ "$VAL" == "SUCCESS" ]; then
-              echo "STATUS=🟢 Full CRUD Success" >> $GITHUB_ENV
-            elif [ "$VAL" == "RUNNING" ]; then
-              echo "STATUS=🔴 UI/Logic Crash (Step failed)" >> $GITHUB_ENV
-            else
-              echo "STATUS=🆘 API Error (Code: $VAL)" >> $GITHUB_ENV
-            fi
+            RESULT=$(cat auth_api_status.txt)
           else
-            echo "STATUS=❌ Fatal Error (Test didn't start)" >> $GITHUB_ENV
+            RESULT="UNKNOWN"
           fi
 
-      - name: Send Telegram
+          # Логика определения галочек
+          # По умолчанию всё - "в ожидании" или "ошибка"
+          S1="❌"; S2="⏳"; S3="⏳"; S4="⏳"; STATUS="🔴 Failed"
+
+          if [[ "$RESULT" == "1" ]]; then S1="✅"; S2="❌"; STATUS="⚠️ Failed at Create"; fi
+          if [[ "$RESULT" == "2" ]]; then S1="✅"; S2="✅"; S3="❌"; STATUS="⚠️ Failed at Edit"; fi
+          if [[ "$RESULT" == "3" ]]; then S1="✅"; S2="✅"; S3="✅"; S4="❌"; STATUS="⚠️ Failed at Delete"; fi
+          if [[ "$RESULT" == "4" ]]; then S1="✅"; S2="✅"; S3="✅"; S4="✅"; STATUS="🟢 Success"; fi
+          if [[ "$RESULT" == ERROR_* ]]; then S1="🆘 ${RESULT}"; STATUS="🔴 Auth Error"; fi
+
+          # Сохраняем для Telegram
+          echo "S1=$S1" >> $GITHUB_ENV
+          echo "S2=$S2" >> $GITHUB_ENV
+          echo "S3=$S3" >> $GITHUB_ENV
+          echo "S4=$S4" >> $GITHUB_ENV
+          echo "FINAL_STATUS=$STATUS" >> $GITHUB_ENV
+
+      - name: Send Telegram Notification
         if: always()
         uses: appleboy/telegram-action@master
         with:
           to: ${{ github.event.inputs.user_chat_id || secrets.TELEGRAM_CHAT_ID }}
-          token: ${{ secrets.TELEGRAM_TOKEN }}
+          token: ${{ secrets.TELEGRAM_TOKEN }} 
           format: markdown
           message: |
-            ${{ github.event_name == 'schedule' && '⏰ **Hourly Check**' || '🔘 **Manual Run**' }}
+            ${{ github.event_name == 'schedule' && '📢 **Hourly Monitoring**' || '👤 **Manual Run**' }}
             
             📂 **Module:** Staff Management
-            📊 **Result:** ${{ env.STATUS }}
-            
+            📊 **Status:** ${{ env.FINAL_STATUS }}
+
             **Flow Steps:**
-            1. Auth ✅
-            2. Create ✅
-            3. Edit ✅
-            4. Delete ✅
+            1. Auth ${{ env.S1 }}
+            2. Create ${{ env.S2 }}
+            3. Edit ${{ env.S3 }}
+            4. Delete ${{ env.S4 }}
             
+       
