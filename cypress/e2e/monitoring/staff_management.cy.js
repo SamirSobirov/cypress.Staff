@@ -75,7 +75,6 @@ describe('Staff Management Flow', { pageLoadTimeout: 120000 }, () => {
     // =========================================================
     cy.log('🟢 ШАГ 2: ДОБАВЛЕНИЕ СОТРУДНИКА');
 
-    // 🔥 Добавлен force: true, чтобы пробить любую зависшую маску загрузки
     cy.get('button.app-button--primary.app-button--xs').click({ force: true });
     cy.wait(2000); 
 
@@ -102,9 +101,14 @@ describe('Staff Management Flow', { pageLoadTimeout: 120000 }, () => {
       .should('be.visible')
       .click({ force: true });
 
-    cy.contains('button.app-button--primary', /Создать|Create|Add/i, { timeout: 10000 })
+    // 🔥 Ждем валидации формы
+    cy.wait(1500);
+
+    // 🔥 Кликаем "Создать" БЕЗ force, ожидая, пока кнопка станет активной
+    cy.contains('button.app-button--primary', /Создать|Create|Add/i, { timeout: 15000 })
       .should('be.visible')
-      .click({ force: true });
+      .should('not.be.disabled') 
+      .click();
 
     cy.wait('@apiCreateStaff', { timeout: 20000 });
     cy.writeFile('auth_api_status.txt', '2');
@@ -119,17 +123,14 @@ describe('Staff Management Flow', { pageLoadTimeout: 120000 }, () => {
       .should('be.visible')
       .click({ force: true });
 
-    // 🔥 Мультиязычный клик "Изменить"
     cy.contains('button', /Изменить|Edit|Update/i, { timeout: 10000 })
       .should('be.visible')
       .click({ force: true });
     
-    // 🔥 Мультиязычный выбор таба
     cy.contains('.p-tab', /Информация о пользователе|User Info/i, { timeout: 10000 })
       .should('be.visible')
       .click({ force: true });
 
-    // Так как тут placeholder, сделаем поиск более универсальным (по типу)
     cy.get('input[type="text"]').eq(0)
       .should('be.visible')
       .click({ force: true })
@@ -142,10 +143,14 @@ describe('Staff Management Flow', { pageLoadTimeout: 120000 }, () => {
       .clear({ force: true })
       .type(editedFirstName, { delay: 100 });
     
-    // 🔥 Мультиязычный клик "Сохранить"
+    // Ждем валидации перед сохранением
+    cy.wait(1000);
+    
+    // 🔥 Сохраняем тоже без force, чтобы убедиться, что данные прошли валидацию
     cy.contains('button.app-button--primary', /Сохранить|Save/i)
       .should('be.visible')
-      .click({ force: true });
+      .should('not.be.disabled')
+      .click();
     
     cy.get('.p-datatable-tbody', { timeout: 15000 }).should('contain', `${editedFirstName}`);
     cy.writeFile('auth_api_status.txt', '3');
@@ -160,11 +165,11 @@ describe('Staff Management Flow', { pageLoadTimeout: 120000 }, () => {
       .should('be.visible')
       .click({ force: true });
     
-    // 🔥 Мультиязычный клик "Удалить"
     cy.contains('button', /Удалить|Delete/i, { timeout: 10000 })
       .should('be.visible')
       .click({ force: true });
 
+    // Модалка удаления обычно не требует валидации, тут force безопасен
     cy.get('.app-confirm-modal__button--accept', { timeout: 15000 })
       .should('be.visible')
       .click({ force: true }); 
