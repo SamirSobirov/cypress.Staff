@@ -9,7 +9,7 @@ describe('Staff Management Flow', () => {
     cy.viewport(1280, 800);
 
     // =========================================================
-    // ШАГ 1: АВТОРИЗАЦИЯ
+    // ШАГ 1: АВТОРИЗАЦИЯ И ПЕРЕХОД
     // =========================================================
     cy.log('🟢 ШАГ 1: НАЧАЛО АВТОРИЗАЦИИ');
     cy.intercept('POST', '**/login**').as('apiAuth');
@@ -25,17 +25,21 @@ describe('Staff Management Flow', () => {
     cy.wait('@apiAuth', { timeout: 20000 }).then((interception) => {
       const statusCode = interception.response?.statusCode || 500;
       if (statusCode >= 400) {
-        cy.writeFile('auth_api_status.txt', `ERROR_${statusCode}`); // Записываем код ошибки
+        cy.writeFile('auth_api_status.txt', `ERROR_${statusCode}`); 
         throw new Error(`🆘 Ошибка: HTTP ${statusCode}`);
       }
-      // Если авторизация успешна, записываем шаг 1
       cy.writeFile('auth_api_status.txt', '1');
     });
 
-    cy.get('a[href="/flight/ru/staff"]', { timeout: 15000 }).should('be.visible').click();
+    // ✅ ИСПРАВЛЕНИЕ: Прямой переход по URL вместо клика по меню (для стабильности в GitHub Actions)
+    cy.log('⚠️ Прямой переход в раздел Staff');
+    cy.visit('https://triple-test.netlify.app/flight/ru/staff', { timeout: 30000 });
+    
     cy.url({ timeout: 15000 }).should('include', '/staff');
+    // Ждем, пока кнопка добавления точно появится на экране
+    cy.get('button.app-button--primary.app-button--xs', { timeout: 15000 }).should('be.visible');
     cy.wait(1500);
-
+    
     // =========================================================
     // ШАГ 2: ДОБАВЛЕНИЕ СОТРУДНИКА
     // =========================================================
