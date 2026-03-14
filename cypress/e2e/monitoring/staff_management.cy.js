@@ -18,13 +18,21 @@ describe('Staff Management Flow', { pageLoadTimeout: 120000 }, () => {
     cy.viewport(1280, 800);
 
     // =========================================================
-    // 🛡️ ЗАЩИТА ОТ ЗАВИСАНИЯ СТРАНИЦЫ
+    // 🛡️ СУПЕР-ЗАЩИТА ОТ ЗАВИСАНИЯ В CI
     // =========================================================
-    cy.log('🛡️ Блокировка внешних скриптов для ускорения загрузки...');
+    cy.log('🛡️ Отключаем загрузку картинок, медиа и трекеров для скорости...');
+    
+    // 🔥 Блокируем ВСЕ картинки и видео (именно они вешают загрузку страницы в CI)
+    cy.intercept({ resourceType: 'image' }, { statusCode: 200, body: '' });
+    cy.intercept({ resourceType: 'media' }, { statusCode: 200, body: '' });
+    
+    // Блокируем аналитику и тяжелые шрифты
     cy.intercept('GET', '**/google-analytics.com/**', { statusCode: 204 });
     cy.intercept('GET', '**/mc.yandex.ru/**', { statusCode: 204 });
     cy.intercept('GET', '**/fonts.googleapis.com/**', { statusCode: 204 });
     cy.intercept('GET', '**/fonts.gstatic.com/**', { statusCode: 204 });
+    // Отключаем Sentry (очень частая причина зависаний)
+    cy.intercept('GET', '**/sentry-cdn.com/**', { statusCode: 204 });
 
     // =========================================================
     // ШАГ 1: АВТОРИЗАЦИЯ И ПЕРЕХОД
@@ -33,6 +41,7 @@ describe('Staff Management Flow', { pageLoadTimeout: 120000 }, () => {
     cy.intercept('POST', '**/login**').as('apiAuth');
     cy.intercept('POST', '**/staff**').as('apiCreateStaff'); 
 
+    // Заходим на сайт. Теперь без картинок он загрузится за секунду.
     cy.visit('https://triple-test.netlify.app/sign-in', { timeout: 120000 }); 
     cy.url().should('include', '/sign-in');
 
@@ -40,14 +49,16 @@ describe('Staff Management Flow', { pageLoadTimeout: 120000 }, () => {
       .should('be.visible')
       .should('not.be.disabled')
       .click({ force: true })
-      .clear({ force: true })
-      .type(Cypress.env('LOGIN_EMAIL'), { delay: 100, log: false }); 
+      .clear()
+      .type(Cypress.env('LOGIN_EMAIL'), { delay: 100, log: false })
+      .blur(); 
 
     cy.get('input[type="password"]')
       .should('be.visible')
       .click({ force: true })
-      .clear({ force: true })
-      .type(Cypress.env('LOGIN_PASSWORD'), { delay: 100, log: false });
+      .clear()
+      .type(Cypress.env('LOGIN_PASSWORD'), { delay: 100, log: false })
+      .blur();
 
     cy.get('button.sign-in-page__submit')
       .should('be.visible')
@@ -62,7 +73,6 @@ describe('Staff Management Flow', { pageLoadTimeout: 120000 }, () => {
       cy.writeFile('auth_api_status.txt', '1');
     });
 
-    // Ждем сохранения токена
     cy.url({ timeout: 20000 }).should('not.include', '/sign-in');
     cy.wait(2000); 
 
@@ -78,7 +88,6 @@ describe('Staff Management Flow', { pageLoadTimeout: 120000 }, () => {
     // =========================================================
     cy.log('🟢 ШАГ 2: ДОБАВЛЕНИЕ СОТРУДНИКА');
 
-    // 🔥 Ищем кнопку "Добавить" и БЬЕМ С ФОРСОМ
     cy.get('button', { timeout: 15000 })
       .filter(':contains("Добавить"), :contains("Add")')
       .first()
@@ -86,9 +95,9 @@ describe('Staff Management Flow', { pageLoadTimeout: 120000 }, () => {
       
     cy.wait(2000); 
 
-    cy.get('input[placeholder="Supplier A"]').first().should('be.visible').click({ force: true }).clear({ force: true }).type(initialLastName, { delay: 100 });
-    cy.get('input[placeholder="Supplier A"]').last().should('be.visible').click({ force: true }).clear({ force: true }).type(initialFirstName, { delay: 100 });
-    cy.get('input[placeholder="example@easybooking.com"]').should('be.visible').click({ force: true }).clear({ force: true }).type(staffEmail, { delay: 100 });
+    cy.get('input[placeholder="Supplier A"]').first().should('be.visible').click({ force: true }).clear().type(initialLastName, { delay: 100 }).blur();
+    cy.get('input[placeholder="Supplier A"]').last().should('be.visible').click({ force: true }).clear().type(initialFirstName, { delay: 100 }).blur();
+    cy.get('input[placeholder="example@easybooking.com"]').should('be.visible').click({ force: true }).clear().type(staffEmail, { delay: 100 }).blur();
 
     cy.contains(/Логин|Login/i, { timeout: 30000 })
       .parent() 
@@ -97,8 +106,9 @@ describe('Staff Management Flow', { pageLoadTimeout: 120000 }, () => {
       .scrollIntoView()         
       .should('be.visible')
       .click({ force: true })   
-      .clear({ force: true })
-      .type(staffLogin, { delay: 100 });
+      .clear()
+      .type(staffLogin, { delay: 100 })
+      .blur();
       
     cy.contains('button.app-button--primary.app-button--sm', /Продолжить|Continue|Next/i, { timeout: 15000 })
       .scrollIntoView() 
@@ -111,7 +121,6 @@ describe('Staff Management Flow', { pageLoadTimeout: 120000 }, () => {
 
     cy.wait(1500);
 
-    // 🔥 Кликаем "Создать" С ФОРСОМ (пробиваем лоадеры), но сначала ждем разблокировки
     cy.contains('button.app-button--primary', /Создать|Create|Add/i, { timeout: 15000 })
       .should('be.visible')
       .should('not.be.disabled') 
@@ -121,7 +130,7 @@ describe('Staff Management Flow', { pageLoadTimeout: 120000 }, () => {
     cy.writeFile('auth_api_status.txt', '2');
 
     // =========================================================
-    // ШАГ 3: РЕДАКТИРОВАНИЕ СОТРУДНИКА
+   // ШАГ 3: РЕДАКТИРОВАНИЕ СОТРУДНИКА
     // =========================================================
     cy.log('🟢 ШАГ 3: РЕДАКТИРОВАНИЕ СОТРУДНИКА');
 
@@ -138,21 +147,21 @@ describe('Staff Management Flow', { pageLoadTimeout: 120000 }, () => {
       .should('be.visible')
       .click({ force: true });
 
+    // 🔥 Убрали .blur(), так как фреймворк сам забирает фокус на крестик
     cy.get('input[type="text"]').eq(0)
       .should('be.visible')
       .click({ force: true })
-      .clear({ force: true })
+      .clear()
       .type(editedLastName, { delay: 100 });
 
     cy.get('input[type="text"]').eq(1)
       .should('be.visible')
       .click({ force: true })
-      .clear({ force: true })
+      .clear()
       .type(editedFirstName, { delay: 100 });
     
     cy.wait(1000);
     
-    // 🔥 Сохраняем С ФОРСОМ
     cy.contains('button.app-button--primary', /Сохранить|Save/i)
       .should('be.visible')
       .should('not.be.disabled')
