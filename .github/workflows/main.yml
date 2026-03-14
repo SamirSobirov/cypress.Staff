@@ -17,22 +17,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # Установка Node
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 18
-          cache: 'npm'
-
-      # Установка зависимостей
-      - name: Install dependencies
-        run: npm ci
-
-      # Запуск Cypress
       - name: Cypress run
         uses: cypress-io/github-action@v6
         with:
-          install: false
           browser: chrome
           spec: cypress/e2e/monitoring/staff_management.cy.js
         env:
@@ -40,16 +27,17 @@ jobs:
           CYPRESS_LOGIN_PASSWORD: ${{ secrets.LOGIN_PASSWORD }}
         continue-on-error: true
 
-      # Анализ результата теста
       - name: Parse Diagnostic Data
         if: always()
         run: |
+          # Читаем результат из файла
           if [ -f auth_api_status.txt ]; then
-            RESULT=$(cat auth_api_status.txt)
+            RESULT=$(cat auth_api_status.txt | tr -d '[:space:]')
           else
-            RESULT="CRASH"
+            RESULT="UNKNOWN"
           fi
 
+          # Настройка индикаторов
           S1="❌"; S2="⏳"; S3="⏳"; S4="⏳"; STATUS="🔴 Failed"
 
           if [[ "$RESULT" == "1" ]]; then S1="✅"; S2="❌"; STATUS="⚠️ Failed at Create"; fi
@@ -57,7 +45,7 @@ jobs:
           if [[ "$RESULT" == "3" ]]; then S1="✅"; S2="✅"; S3="✅"; S4="❌"; STATUS="⚠️ Failed at Delete"; fi
           if [[ "$RESULT" == "4" ]]; then S1="✅"; S2="✅"; S3="✅"; S4="✅"; STATUS="🟢 Success"; fi
           if [[ "$RESULT" == ERROR_* ]]; then S1="🆘 ${RESULT}"; STATUS="🔴 Auth Error"; fi
-          if [[ "$RESULT" == "CRASH" ]]; then STATUS="❌ Runner Crash"; fi
+          if [[ "$RESULT" == "UNKNOWN" ]]; then STATUS="❌ UI Crash / Timeout"; fi
 
           echo "S1=$S1" >> $GITHUB_ENV
           echo "S2=$S2" >> $GITHUB_ENV
@@ -65,7 +53,6 @@ jobs:
           echo "S4=$S4" >> $GITHUB_ENV
           echo "FINAL_STATUS=$STATUS" >> $GITHUB_ENV
 
-      # Отправка Telegram уведомления
       - name: Send Telegram Notification
         if: always()
         uses: appleboy/telegram-action@master
