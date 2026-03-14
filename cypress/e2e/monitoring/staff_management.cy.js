@@ -86,14 +86,18 @@ describe('Staff Management Flow', { pageLoadTimeout: 120000 }, () => {
     // Вводим статичную почту
     cy.get('input[placeholder="example@easybooking.com"]').should('be.visible').click().clear().type(staffEmail, { delay: 100 });
 
-    // Вводим статичный логин
-    cy.get('input[placeholder*="логин"]', { timeout: 20000 })
+  // 🔥 БРОНЕБОЙНЫЙ ВВОД ЛОГИНА (Вообще без привязки к placeholder)
+    // Ищем текст "Логин" (или "Login"), поднимаемся к его контейнеру и находим там инпут
+    cy.contains(/Логин|Login/i, { timeout: 30000 })
+      .parent() // Поднимаемся к обертке поля
+      .find('input')
+      .first()
       .scrollIntoView()         
       .should('be.visible')
       .click({ force: true })   
       .clear({ force: true })
       .type(staffLogin, { delay: 100 });
-
+      
     cy.get('button.app-button--primary.app-button--sm')
       .contains('Продолжить')
       .scrollIntoView() 
