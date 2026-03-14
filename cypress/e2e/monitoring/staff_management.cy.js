@@ -67,7 +67,8 @@ describe('Staff Management Flow', { pageLoadTimeout: 120000 }, () => {
     
     cy.url({ timeout: 20000 }).should('include', '/staff');
     
-    cy.get('button.app-button--primary.app-button--xs', { timeout: 30000 })
+    // 🔥 Исправлено: Ждем кнопку по тексту "Добавить" (или Add), а не по классу
+    cy.contains('button', /Добавить|Add/i, { timeout: 30000 })
       .should('be.visible');
     
     // =========================================================
@@ -75,7 +76,8 @@ describe('Staff Management Flow', { pageLoadTimeout: 120000 }, () => {
     // =========================================================
     cy.log('🟢 ШАГ 2: ДОБАВЛЕНИЕ СОТРУДНИКА');
 
-    cy.get('button.app-button--primary.app-button--xs').click({ force: true });
+    // 🔥 Исправлено: Кликаем по кнопке по тексту
+    cy.contains('button', /Добавить|Add/i).click({ force: true });
     cy.wait(2000); 
 
     cy.get('input[placeholder="Supplier A"]').first().should('be.visible').click({ force: true }).clear().type(initialLastName, { delay: 100 });
