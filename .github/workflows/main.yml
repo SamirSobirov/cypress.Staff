@@ -12,20 +12,35 @@ on:
 jobs:
   cypress-run:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # Установка Node
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: 'npm'
+
+      # Установка зависимостей
+      - name: Install dependencies
+        run: npm ci
+
+      # Запуск Cypress
       - name: Cypress run
         uses: cypress-io/github-action@v6
         with:
-          spec: cypress/e2e/monitoring/staff_management.cy.js
+          install: false
           browser: chrome
+          spec: cypress/e2e/monitoring/staff_management.cy.js
         env:
           CYPRESS_LOGIN_EMAIL: ${{ secrets.LOGIN_EMAIL }}
           CYPRESS_LOGIN_PASSWORD: ${{ secrets.LOGIN_PASSWORD }}
         continue-on-error: true
 
+      # Анализ результата теста
       - name: Parse Diagnostic Data
         if: always()
         run: |
@@ -50,16 +65,17 @@ jobs:
           echo "S4=$S4" >> $GITHUB_ENV
           echo "FINAL_STATUS=$STATUS" >> $GITHUB_ENV
 
+      # Отправка Telegram уведомления
       - name: Send Telegram Notification
         if: always()
         uses: appleboy/telegram-action@master
         with:
           to: ${{ github.event.inputs.user_chat_id || secrets.TELEGRAM_CHAT_ID }}
-          token: ${{ secrets.TELEGRAM_TOKEN }} 
+          token: ${{ secrets.TELEGRAM_TOKEN }}
           format: markdown
           message: |
             ${{ github.event_name == 'schedule' && '📢 **Hourly Monitoring**' || '👤 **Manual Run**' }}
-            
+
             📂 **Module:** Staff Management
             📊 **Status:** ${{ env.FINAL_STATUS }}
 
@@ -68,5 +84,3 @@ jobs:
             2. Create ${{ env.S2 }}
             3. Edit ${{ env.S3 }}
             4. Delete ${{ env.S4 }}
-            
-          
