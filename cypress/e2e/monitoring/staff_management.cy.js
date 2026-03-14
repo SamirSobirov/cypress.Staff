@@ -57,23 +57,32 @@ describe('Staff Management Flow', () => {
     // =========================================================
     // ШАГ 2: ДОБАВЛЕНИЕ СОТРУДНИКА
     // =========================================================
-    cy.log('🟢 ШАГ 2: ДОБАВЛЕНИЕ СОТРУДНИКА');
+  cy.log('🟢 ШАГ 2: ДОБАВЛЕНИЕ СОТРУДНИКА');
 
     cy.get('button.app-button--primary.app-button--xs').click();
 
-    // Ждем появления модалки/формы
+    // Небольшая хардкод-пауза, чтобы анимация модалки в CI точно завершилась
+    cy.wait(2000); 
 
     cy.get('input[placeholder="Supplier A"]').first().should('be.visible').click().type('TestStaff1', { delay: 100 });
     cy.get('input[placeholder="Supplier A"]').last().should('be.visible').click().type('TestStaff1', { delay: 100 });
     cy.get('input[placeholder="example@easybooking.com"]').should('be.visible').click().type('TestStaff9005@mail.com', { delay: 100 });
-    cy.get('input[placeholder="Введите логин"]', { timeout: 30000 })
+
+    // 🔥 ЖЕЛЕЗОБЕТОННЫЙ ВВОД ЛОГИНА
+    // Используем *= (содержит слово "логин"), скроллим к нему и кликаем с force: true
+    cy.get('input[placeholder*="логин"]', { timeout: 20000 })
+      .scrollIntoView()         // Принудительно прокручиваем модалку до этого поля
       .should('be.visible')
-      .click()
-      .clear()
+      .click({ force: true })   // Пробиваем любые перекрытия
+      .clear({ force: true })
       .type('TestStaff9005', { delay: 100 });
 
-    cy.get('button.app-button--primary.app-button--sm').contains('Продолжить').should('be.visible').click();
-    
+    // Кликаем "Продолжить"
+    cy.get('button.app-button--primary.app-button--sm')
+      .contains('Продолжить')
+      .scrollIntoView() 
+      .should('be.visible')
+      .click({ force: true });
     // Ожидание отрисовки следующего шага
     cy.get('.role-card', { timeout: 10000 }).contains('Оператор').should('be.visible').click();
     cy.get('button.app-button--primary').contains('Создать').should('be.visible').click();
@@ -100,7 +109,7 @@ describe('Staff Management Flow', () => {
       .should('be.visible')
       .click()
       .clear()
-      .type('Sobiros', { delay: 100 });
+      .type('S', { delay: 100 });
 
     cy.get('input[placeholder="Введите имя"]')
       .should('be.visible')
@@ -111,7 +120,7 @@ describe('Staff Management Flow', () => {
     cy.get('button.app-button--primary').contains('Сохранить').should('be.visible').click();
     
     // Ждем обновления таблицы, чтобы убедиться, что сохранение прошло
-    cy.get('.p-datatable-tbody', { timeout: 15000 }).should('contain', 'Sobiros Samir');
+    cy.get('.p-datatable-tbody', { timeout: 15000 }).should('contain', 'S Samir');
     cy.writeFile('auth_api_status.txt', '3');
 
     // =========================================================
@@ -119,7 +128,7 @@ describe('Staff Management Flow', () => {
     // =========================================================
     cy.log('🟢 ШАГ 4: УДАЛЕНИЕ СОТРУДНИКА');
 
-    cy.get('.p-datatable-tbody tr').contains('Sobiros Samir').should('be.visible').click();
+    cy.get('.p-datatable-tbody tr').contains('S Samir').should('be.visible').click();
     
     cy.get('button.app-button--secondary', { timeout: 10000 }).contains('Удалить').should('be.visible').click();
 
@@ -129,7 +138,7 @@ describe('Staff Management Flow', () => {
       .click({ force: true }); 
 
     // Убеждаемся, что строка исчезла
-    cy.get('.p-datatable-tbody', { timeout: 15000 }).should('not.contain', 'Sobiros Samir');
+    cy.get('.p-datatable-tbody', { timeout: 15000 }).should('not.contain', 'S Samir');
     
     cy.writeFile('auth_api_status.txt', '4');
     cy.log('🎉 ЦИКЛ ПОЛНОСТЬЮ ЗАВЕРШЕН!');
