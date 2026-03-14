@@ -2,17 +2,16 @@ name: Staff Management CRUD Monitoring
 
 on:
   schedule:
-    - cron: '0 * * * *'
+    - cron: '0 * * * *' # Каждый час
   workflow_dispatch:
     inputs:
       user_chat_id:
-        description: 'ID чата для личного ответа'
+        description: 'Telegram Chat ID (optional)'
         required: false
 
 jobs:
   cypress-run:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -22,7 +21,6 @@ jobs:
         with:
           browser: chrome
           spec: cypress/e2e/monitoring/staff_management.cy.js
-          # 🔥 Отключаем скриншоты и видео при падении
           config: screenshotOnRunFailure=false,video=false
         env:
           CYPRESS_LOGIN_EMAIL: ${{ secrets.LOGIN_EMAIL }}
@@ -32,15 +30,14 @@ jobs:
       - name: Parse Diagnostic Data
         if: always()
         run: |
-          # Читаем результат из файла
           if [ -f auth_api_status.txt ]; then
             RESULT=$(cat auth_api_status.txt | tr -d '[:space:]')
           else
             RESULT="UNKNOWN"
           fi
 
-          # Настройка индикаторов
-          S1="❌"; S2="⏳"; S3="⏳"; S4="⏳"; STATUS="🔴 Failed"
+          # Инициализация эмодзи
+          S1="⏳"; S2="⏳"; S3="⏳"; S4="⏳"; STATUS="🔴 Failed"
 
           if [[ "$RESULT" == "1" ]]; then S1="✅"; S2="❌"; STATUS="⚠️ Failed at Create"; fi
           if [[ "$RESULT" == "2" ]]; then S1="✅"; S2="✅"; S3="❌"; STATUS="⚠️ Failed at Edit"; fi
