@@ -1,4 +1,5 @@
-describe('Staff Management Flow', () => {
+// Передаем увеличенный pageLoadTimeout прямо в этот сьют, чтобы обойти дефолтные 60 сек
+describe('Staff Management Flow', { pageLoadTimeout: 120000 }, () => {
 
   before(() => {
     cy.writeFile('auth_api_status.txt', '0');
@@ -8,13 +9,23 @@ describe('Staff Management Flow', () => {
     cy.viewport(1280, 800);
 
     // =========================================================
+    // 🛡️ ЗАЩИТА ОТ ЗАВИСАНИЯ СТРАНИЦЫ В CI (Блокировка аналитики и шрифтов)
+    // =========================================================
+    cy.log('🛡️ Блокировка внешних скриптов для ускорения загрузки...');
+    cy.intercept('GET', '**/google-analytics.com/**', { statusCode: 204 });
+    cy.intercept('GET', '**/mc.yandex.ru/**', { statusCode: 204 });
+    cy.intercept('GET', '**/fonts.googleapis.com/**', { statusCode: 204 });
+    cy.intercept('GET', '**/fonts.gstatic.com/**', { statusCode: 204 });
+
+    // =========================================================
     // ШАГ 1: АВТОРИЗАЦИЯ И ПЕРЕХОД
     // =========================================================
     cy.log('🟢 ШАГ 1: НАЧАЛО АВТОРИЗАЦИИ');
     cy.intercept('POST', '**/login**').as('apiAuth');
     cy.intercept('POST', '**/staff**').as('apiCreateStaff'); 
 
-    cy.visit('https://triple-test.netlify.app/sign-in', { timeout: 60000 }); // Увеличен таймаут для CI
+    // Увеличен таймаут для CI (хотя глобальный pageLoadTimeout теперь тоже 120s)
+    cy.visit('https://triple-test.netlify.app/sign-in', { timeout: 120000 }); 
     cy.url().should('include', '/sign-in');
 
     // Ждем именно видимости инпута, кликаем, затем вводим с бОльшим delay
@@ -46,7 +57,7 @@ describe('Staff Management Flow', () => {
     });
 
     cy.log('⚠️ Прямой переход в раздел Staff');
-    cy.visit('https://triple-test.netlify.app/flight/ru/staff', { timeout: 60000 });
+    cy.visit('https://triple-test.netlify.app/flight/ru/staff', { timeout: 120000 });
     
     cy.url({ timeout: 20000 }).should('include', '/staff');
     
@@ -57,7 +68,7 @@ describe('Staff Management Flow', () => {
     // =========================================================
     // ШАГ 2: ДОБАВЛЕНИЕ СОТРУДНИКА
     // =========================================================
-  cy.log('🟢 ШАГ 2: ДОБАВЛЕНИЕ СОТРУДНИКА');
+    cy.log('🟢 ШАГ 2: ДОБАВЛЕНИЕ СОТРУДНИКА');
 
     cy.get('button.app-button--primary.app-button--xs').click();
 
@@ -69,11 +80,10 @@ describe('Staff Management Flow', () => {
     cy.get('input[placeholder="example@easybooking.com"]').should('be.visible').click().type('TestStaff9005@mail.com', { delay: 100 });
 
     // 🔥 ЖЕЛЕЗОБЕТОННЫЙ ВВОД ЛОГИНА
-    // Используем *= (содержит слово "логин"), скроллим к нему и кликаем с force: true
     cy.get('input[placeholder*="логин"]', { timeout: 20000 })
-      .scrollIntoView()         // Принудительно прокручиваем модалку до этого поля
+      .scrollIntoView()         
       .should('be.visible')
-      .click({ force: true })   // Пробиваем любые перекрытия
+      .click({ force: true })   
       .clear({ force: true })
       .type('TestStaff9005', { delay: 100 });
 
@@ -83,6 +93,7 @@ describe('Staff Management Flow', () => {
       .scrollIntoView() 
       .should('be.visible')
       .click({ force: true });
+      
     // Ожидание отрисовки следующего шага
     cy.get('.role-card', { timeout: 10000 }).contains('Оператор').should('be.visible').click();
     cy.get('button.app-button--primary').contains('Создать').should('be.visible').click();
