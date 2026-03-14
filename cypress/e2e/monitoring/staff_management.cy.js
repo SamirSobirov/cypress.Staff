@@ -1,7 +1,6 @@
 describe('Staff Management Flow', () => {
 
   before(() => {
-    // Изначально статус 0 (ничего не пройдено)
     cy.writeFile('auth_api_status.txt', '0');
   });
 
