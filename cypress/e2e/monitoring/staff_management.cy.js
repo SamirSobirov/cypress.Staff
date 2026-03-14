@@ -74,7 +74,7 @@ describe('Staff Management Flow', { pageLoadTimeout: 120000 }, () => {
     // =========================================================
     // ШАГ 2: ДОБАВЛЕНИЕ СОТРУДНИКА
     // =========================================================
-    cy.log('🟢 ШАГ 2: ДОБАВЛЕНИЕ СОТРУДНИКА');
+   cy.log('🟢 ШАГ 2: ДОБАВЛЕНИЕ СОТРУДНИКА');
 
     cy.get('button.app-button--primary.app-button--xs').click();
     cy.wait(2000); 
@@ -86,8 +86,7 @@ describe('Staff Management Flow', { pageLoadTimeout: 120000 }, () => {
     // Вводим статичную почту
     cy.get('input[placeholder="example@easybooking.com"]').should('be.visible').click().clear().type(staffEmail, { delay: 100 });
 
-  // 🔥 БРОНЕБОЙНЫЙ ВВОД ЛОГИНА (Вообще без привязки к placeholder)
-    // Ищем текст "Логин" (или "Login"), поднимаемся к его контейнеру и находим там инпут
+    // 🔥 БРОНЕБОЙНЫЙ ВВОД ЛОГИНА (Вообще без привязки к placeholder)
     cy.contains(/Логин|Login/i, { timeout: 30000 })
       .parent() // Поднимаемся к обертке поля
       .find('input')
@@ -98,14 +97,21 @@ describe('Staff Management Flow', { pageLoadTimeout: 120000 }, () => {
       .clear({ force: true })
       .type(staffLogin, { delay: 100 });
       
-    cy.get('button.app-button--primary.app-button--sm')
-      .contains('Продолжить')
+    // 🔥 Мультиязычный клик "Продолжить" (на случай английского интерфейса в CI)
+    cy.contains('button.app-button--primary.app-button--sm', /Продолжить|Continue|Next/i, { timeout: 15000 })
       .scrollIntoView() 
       .should('be.visible')
       .click({ force: true });
       
-    cy.get('.role-card', { timeout: 10000 }).contains('Оператор').should('be.visible').click();
-    cy.get('button.app-button--primary').contains('Создать').should('be.visible').click();
+    // 🔥 Мультиязычный выбор роли
+    cy.contains('.role-card', /Оператор|Operator/i, { timeout: 10000 })
+      .should('be.visible')
+      .click();
+
+    // 🔥 Мультиязычная кнопка "Создать"
+    cy.contains('button.app-button--primary', /Создать|Create|Add/i, { timeout: 10000 })
+      .should('be.visible')
+      .click();
 
     cy.wait('@apiCreateStaff', { timeout: 20000 });
     cy.writeFile('auth_api_status.txt', '2');
