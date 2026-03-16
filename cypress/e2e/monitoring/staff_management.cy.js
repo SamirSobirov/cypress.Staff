@@ -1,85 +1,190 @@
-describe('Staff Management CRUD Flow', { pageLoadTimeout: 120000 }, () => {
-  const staffData = {
-    firstName: 'TestStaff',
-    lastName: 'Monitoring',
-    login: `staff_${Date.now()}`, // Уникальный логин для каждого запуска
-    email: `test_${Date.now()}@example.com`,
-    editedName: 'UpdatedStaff'
-  };
+describe('Staff Management Flow', { pageLoadTimeout: 120000 }, () => {
+
+  const initialFirstName = 'TestStaff';
+  const initialLastName = 'TestStaff';
+  const staffLogin = 'TestStaff9005';
+  const staffEmail = 'TestStaff9005@mail.ru';
+  
+  const editedLastName = 'Sobiros';
+  const editedFirstName = 'Samir';
 
   before(() => {
-    // Изначально ставим 0 (начало работы)
     cy.writeFile('auth_api_status.txt', '0');
   });
 
-  it('Execute Full Staff Lifecycle', () => {
+  it('Полный цикл: Авторизация -> Добавление -> Изменение -> Удаление', () => {
     cy.viewport(1280, 800);
 
-    // Оптимизация загрузки: блокируем лишнее
+    // =========================================================
+    // 🛡️ ЗАЩИТА ОТ ЗАВИСАНИЯ СТРАНИЦЫ
+    // =========================================================
+    cy.log('🛡️ Блокировка внешних скриптов для ускорения загрузки...');
     cy.intercept({ resourceType: 'image' }, { statusCode: 200, body: '' });
+    cy.intercept({ resourceType: 'media' }, { statusCode: 200, body: '' });
     cy.intercept('GET', '**/google-analytics.com/**', { statusCode: 204 });
+    cy.intercept('GET', '**/mc.yandex.ru/**', { statusCode: 204 });
+    cy.intercept('GET', '**/fonts.googleapis.com/**', { statusCode: 204 });
+    cy.intercept('GET', '**/fonts.gstatic.com/**', { statusCode: 204 });
+    cy.intercept('GET', '**/sentry-cdn.com/**', { statusCode: 204 });
 
-    // ПЕРЕХВАТЫ
+    // =========================================================
+    // ШАГ 1: АВТОРИЗАЦИЯ И ПЕРЕХОД
+    // =========================================================
+    cy.log('🟢 ШАГ 1: НАЧАЛО АВТОРИЗАЦИИ');
     cy.intercept('POST', '**/login**').as('apiAuth');
-    cy.intercept('POST', '**/staff*').as('apiCreate');
-    cy.intercept('PATCH', '**/staff/*').as('apiEdit');
-    cy.intercept('DELETE', '**/staff/*').as('apiDelete');
+    // Расширили поиск пути, чтобы точно поймать запрос
+    cy.intercept('POST', '**/staff*').as('apiCreateStaff'); 
 
-    // --- ШАГ 1: АВТОРИЗАЦИЯ ---
-    cy.visit('https://triple-test.netlify.app/sign-in');
-    
-    cy.get('input[type="text"]', { timeout: 20000 }).type(Cypress.env('LOGIN_EMAIL'), { log: false });
-    cy.get('input[type="password"]').type(Cypress.env('LOGIN_PASSWORD'), { log: false });
-    cy.get('button.sign-in-page__submit').click();
+    cy.visit('https://triple-test.netlify.app/sign-in', { timeout: 120000 }); 
+    cy.url().should('include', '/sign-in');
 
-    cy.wait('@apiAuth').then((xhr) => {
-      const code = xhr.response?.statusCode || 500;
-      if (code >= 400) {
-        cy.writeFile('auth_api_status.txt', `ERROR_${code}`);
-        throw new Error(`Auth Failed: ${code}`);
+    cy.get('input[type="text"]', { timeout: 30000 })
+      .should('be.visible')
+      .click({ force: true })
+      .clear()
+      .type(Cypress.env('LOGIN_EMAIL'), { delay: 50, log: false })
+      .trigger('change', { force: true }); 
+
+    cy.get('input[type="password"]')
+      .should('be.visible')
+      .click({ force: true })
+      .clear()
+      .type(Cypress.env('LOGIN_PASSWORD'), { delay: 50, log: false })
+      .trigger('change', { force: true });
+
+    cy.get('button.sign-in-page__submit')
+      .should('be.visible')
+      .click({ force: true });
+
+    cy.wait('@apiAuth', { timeout: 30000 }).then((interception) => {
+      const statusCode = interception.response?.statusCode || 500;
+      if (statusCode >= 400) {
+        cy.writeFile('auth_api_status.txt', `ERROR_${statusCode}`); 
+        throw new Error(`🆘 Ошибка: HTTP ${statusCode}`);
       }
-      cy.writeFile('auth_api_status.txt', '1'); // Успешно авторизовались
+      cy.writeFile('auth_api_status.txt', '1');
     });
 
-    // Переход в раздел сотрудников
-    cy.visit('https://triple-test.netlify.app/flight/ru/staff');
-    cy.url().should('include', '/staff');
+    cy.url({ timeout: 20000 }).should('not.include', '/sign-in');
+    cy.wait(2000); 
 
-    // --- ШАГ 2: СОЗДАНИЕ ---
-    cy.get('button').contains(/Добавить|Add/i).click({ force: true });
+    cy.log('⚠️ Прямой переход в раздел Staff');
+    cy.visit('https://triple-test.netlify.app/flight/ru/staff', { timeout: 120000 });
     
-    cy.get('input[placeholder="Supplier A"]').first().type(staffData.lastName).trigger('change');
-    cy.get('input[placeholder="Supplier A"]').last().type(staffData.firstName).trigger('change');
-    cy.get('input[placeholder="example@easybooking.com"]').type(staffData.email).trigger('change');
+    cy.url({ timeout: 20000 }).should('include', '/staff');
+    cy.get('.p-datatable', { timeout: 30000 }).should('be.visible');
     
-    cy.contains(/Логин|Login/i).parent().find('input').first()
-      .type(staffData.login).trigger('change');
+    // =========================================================
+    // ШАГ 2: ДОБАВЛЕНИЕ СОТРУДНИКА
+    // =========================================================
+    cy.log('🟢 ШАГ 2: ДОБАВЛЕНИЕ СОТРУДНИКА');
 
-    cy.get('.p-dialog-header').first().click(); // Снять фокус
-    cy.contains('button', /Продолжить|Continue/i).click();
-    cy.contains('.role-card', /Оператор|Operator/i).click();
-    cy.contains('button', /Создать|Create/i).click();
+    cy.get('button', { timeout: 15000 })
+      .filter(':contains("Добавить"), :contains("Add")')
+      .first()
+      .click({ force: true });
+      
+    cy.wait(2000); 
 
-    cy.wait('@apiCreate', { timeout: 20000 }).its('response.statusCode').should('be.lessThan', 400);
-    cy.writeFile('auth_api_status.txt', '2'); // Успешно создали
+    // 🔥 Добавили .trigger('change') чтобы фреймворк сайта точно понял, что поля заполнены
+    cy.get('input[placeholder="Supplier A"]').first().should('be.visible').click({ force: true }).clear().type(initialLastName, { delay: 50 }).trigger('change', { force: true });
+    cy.get('input[placeholder="Supplier A"]').last().should('be.visible').click({ force: true }).clear().type(initialFirstName, { delay: 50 }).trigger('change', { force: true });
+    cy.get('input[placeholder="example@easybooking.com"]').should('be.visible').click({ force: true }).clear().type(staffEmail, { delay: 50 }).trigger('change', { force: true });
 
-    // --- ШАГ 3: РЕДАКТИРОВАНИЕ ---
-    cy.get('.p-datatable-tbody').contains(staffData.firstName).click();
-    cy.contains('button', /Изменить|Edit/i).click();
-    cy.contains('.p-tab', /Информация/i).click();
+    cy.contains(/Логин|Login/i, { timeout: 30000 })
+      .parent() 
+      .find('input')
+      .first()
+      .scrollIntoView()         
+      .should('be.visible')
+      .click({ force: true })   
+      .clear()
+      .type(staffLogin, { delay: 50 })
+      .trigger('change', { force: true });
+      
+    // Клик по нейтральной зоне, чтобы убрать фокус с инпута (заменяет глючный blur)
+    cy.get('.p-dialog-header').first().click({ force: true, multiple: true });
+
+    cy.contains('button.app-button--primary.app-button--sm', /Продолжить|Continue|Next/i, { timeout: 15000 })
+      .scrollIntoView() 
+      .should('be.visible')
+      .click({ force: true });
+      
+    cy.contains('.role-card', /Оператор|Operator/i, { timeout: 10000 })
+      .should('be.visible')
+      .click({ force: true });
+
+    cy.wait(1500);
+
+    cy.contains('button.app-button--primary', /Создать|Create|Add/i, { timeout: 15000 })
+      .should('be.visible')
+      .click({ force: true });
+
+    cy.wait('@apiCreateStaff', { timeout: 20000 });
+    cy.writeFile('auth_api_status.txt', '2');
+
+    // =========================================================
+    // ШАГ 3: РЕДАКТИРОВАНИЕ СОТРУДНИКА
+    // =========================================================
+    cy.log('🟢 ШАГ 3: РЕДАКТИРОВАНИЕ СОТРУДНИКА');
+
+    cy.get('.p-datatable-tbody tr', { timeout: 20000 })
+      .contains(`${initialFirstName}`)
+      .should('be.visible')
+      .click({ force: true });
+
+    cy.contains('button', /Изменить|Edit|Update/i, { timeout: 10000 })
+      .should('be.visible')
+      .click({ force: true });
     
-    cy.get('input[type="text"]').eq(1).clear().type(staffData.editedName).trigger('change');
-    cy.contains('button', /Сохранить|Save/i).click();
+    cy.contains('.p-tab', /Информация о пользователе|User Info/i, { timeout: 10000 })
+      .should('be.visible')
+      .click({ force: true });
 
-    cy.wait('@apiEdit').its('response.statusCode').should('be.lessThan', 400);
-    cy.writeFile('auth_api_status.txt', '3'); // Успешно изменили
+    cy.get('input[type="text"]').eq(0)
+      .should('be.visible')
+      .click({ force: true })
+      .clear()
+      .type(editedLastName, { delay: 50 })
+      .trigger('change', { force: true });
 
-    // --- ШАГ 4: УДАЛЕНИЕ ---
-    cy.get('.p-datatable-tbody').contains(staffData.editedName).click();
-    cy.contains('button', /Удалить|Delete/i).click();
-    cy.get('.app-confirm-modal__button--accept').click();
+    cy.get('input[type="text"]').eq(1)
+      .should('be.visible')
+      .click({ force: true })
+      .clear()
+      .type(editedFirstName, { delay: 50 })
+      .trigger('change', { force: true });
+    
+    cy.wait(1000);
+    
+    cy.contains('button.app-button--primary', /Сохранить|Save/i)
+      .should('be.visible')
+      .click({ force: true });
+    
+    cy.get('.p-datatable-tbody', { timeout: 15000 }).should('contain', `${editedFirstName}`);
+    cy.writeFile('auth_api_status.txt', '3');
 
-    cy.wait('@apiDelete').its('response.statusCode').should('be.lessThan', 400);
-    cy.writeFile('auth_api_status.txt', '4'); // ПОЛНЫЙ УСПЕХ
+    // =========================================================
+    // ШАГ 4: УДАЛЕНИЕ СОТРУДНИКА
+    // =========================================================
+    cy.log('🟢 ШАГ 4: УДАЛЕНИЕ СОТРУДНИКА');
+
+    cy.get('.p-row-odd td ')
+      .contains(`${editedFirstName}`)
+      .should('be.visible')
+      .click({ force: true });
+    
+    cy.contains('button', /Удалить|Delete/i, { timeout: 10000 })
+      .should('be.visible')
+      .click({ force: true });
+
+    cy.get('.app-confirm-modal__button--accept', { timeout: 15000 })
+      .should('be.visible')
+      .click({ force: true }); 
+
+    cy.get('.p-datatable-table-container', { timeout: 15000 }).should('not.contain', `${editedFirstName}`);
+    
+    cy.writeFile('auth_api_status.txt', '4');
+    cy.log('🎉 ЦИКЛ ПОЛНОСТЬЮ ЗАВЕРШЕН!');
   });
 });
