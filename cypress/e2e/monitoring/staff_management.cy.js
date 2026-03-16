@@ -32,8 +32,10 @@ describe('Staff Management Flow', { pageLoadTimeout: 120000 }, () => {
     // =========================================================
     cy.log('🟢 ШАГ 1: НАЧАЛО АВТОРИЗАЦИИ');
     cy.intercept('POST', '**/login**').as('apiAuth');
-    // Расширили поиск пути, чтобы точно поймать запрос
     cy.intercept('POST', '**/staff*').as('apiCreateStaff'); 
+    
+    // 🔥 ДОБАВЛЕНО: Перехватываем GET запрос загрузки списка сотрудников
+    cy.intercept('GET', '**/staff*').as('getStaffList');
 
     cy.visit('https://triple-test.netlify.app/sign-in', { timeout: 120000 }); 
     cy.url().should('include', '/sign-in');
@@ -65,13 +67,23 @@ describe('Staff Management Flow', { pageLoadTimeout: 120000 }, () => {
       cy.writeFile('auth_api_status.txt', '1');
     });
 
+    // 🔥 ИСПРАВЛЕННАЯ ЛОГИКА ОЖИДАНИЯ ПЕРЕХОДА:
     cy.url({ timeout: 20000 }).should('not.include', '/sign-in');
-    cy.wait(2000); 
+    
+    // Ждем появления body на дэшборде, чтобы убедиться, что SPA приложение успело сохранить токен
+    cy.get('body').should('be.visible'); 
+    cy.wait(1000); // Небольшая пауза для страховки записи в localStorage
 
     cy.log('⚠️ Прямой переход в раздел Staff');
     cy.visit('https://triple-test.netlify.app/flight/ru/staff', { timeout: 120000 });
     
     cy.url({ timeout: 20000 }).should('include', '/staff');
+    
+    // Ждем, пока сервер вернет данные для таблицы, прежде чем искать ее в DOM
+    cy.wait('@getStaffList', { timeout: 30000 }).then((interception) => {
+      expect(interception.response.statusCode).to.be.lessThan(400);
+    });
+
     cy.get('.p-datatable', { timeout: 30000 }).should('be.visible');
     
     // =========================================================
@@ -86,7 +98,6 @@ describe('Staff Management Flow', { pageLoadTimeout: 120000 }, () => {
       
     cy.wait(2000); 
 
-    // 🔥 Добавили .trigger('change') чтобы фреймворк сайта точно понял, что поля заполнены
     cy.get('input[placeholder="Supplier A"]').first().should('be.visible').click({ force: true }).clear().type(initialLastName, { delay: 50 }).trigger('change', { force: true });
     cy.get('input[placeholder="Supplier A"]').last().should('be.visible').click({ force: true }).clear().type(initialFirstName, { delay: 50 }).trigger('change', { force: true });
     cy.get('input[placeholder="example@easybooking.com"]').should('be.visible').click({ force: true }).clear().type(staffEmail, { delay: 50 }).trigger('change', { force: true });
@@ -102,7 +113,6 @@ describe('Staff Management Flow', { pageLoadTimeout: 120000 }, () => {
       .type(staffLogin, { delay: 50 })
       .trigger('change', { force: true });
       
-    // Клик по нейтральной зоне, чтобы убрать фокус с инпута (заменяет глючный blur)
     cy.get('.p-dialog-header').first().click({ force: true, multiple: true });
 
     cy.contains('button.app-button--primary.app-button--sm', /Продолжить|Continue|Next/i, { timeout: 15000 })
