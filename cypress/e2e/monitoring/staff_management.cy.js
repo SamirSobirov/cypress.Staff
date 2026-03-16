@@ -130,10 +130,22 @@ describe('Staff Management Flow', { pageLoadTimeout: 120000 }, () => {
       .should('be.visible')
       .click({ force: true });
 
+    cy.wait(1500); // Даем время интерфейсу применить выбранную роль
+
+    // 📸 ДЕЛАЕМ СКРИНШОТ перед кликом (посмотрим, заполнены ли поля и активна ли кнопка)
+    cy.screenshot('1-before-create-click');
+
+    // Проверяем, что кнопка реально активна (не disabled) перед кликом
     cy.contains('button', /Создать|Create|Add/i, { timeout: 15000 })
       .should('be.visible')
+      .should('not.be.disabled') // Защита от заблокированной кнопки из-за ошибок валидации
       .click({ force: true });
 
+    // 📸 ДЕЛАЕМ СКРИНШОТ после клика (посмотрим, не вылезла ли красная ошибка на форме)
+    cy.wait(1500);
+    cy.screenshot('2-after-create-click');
+
+    // Ожидаем запрос
     cy.wait('@apiCreateStaff', { timeout: 20000 });
     cy.writeFile('auth_api_status.txt', '2');
 
