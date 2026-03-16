@@ -34,20 +34,26 @@ describe('Staff Management Flow', { pageLoadTimeout: 120000 }, () => {
     cy.intercept('POST', '**/login**').as('apiAuth');
     cy.intercept('POST', '**/staff*').as('apiCreateStaff'); 
     
-    // 🔥 ДОБАВЛЕНО: Перехватываем GET запрос загрузки списка сотрудников
+    // Перехватываем GET запрос загрузки списка сотрудников
     cy.intercept('GET', '**/staff*').as('getStaffList');
 
     cy.visit('https://triple-test.netlify.app/sign-in', { timeout: 120000 }); 
     cy.url().should('include', '/sign-in');
 
-    cy.get('input[type="text"]', { timeout: 30000 })
+    // 🔥 ИСПРАВЛЕНИЕ: Ждем, пока прогрузится контейнер страницы авторизации
+    cy.get('body').should('be.visible');
+    cy.wait(2000); // Даем время фреймворку отрендерить инпуты
+
+    // 🔥 ИСПРАВЛЕНИЕ: Универсальный селектор для поля логина
+    cy.get('input[type="text"], input[type="email"], input[name="email"], input[name="login"]', { timeout: 30000 })
+      .first()
       .should('be.visible')
       .click({ force: true })
       .clear()
       .type(Cypress.env('LOGIN_EMAIL'), { delay: 50, log: false })
       .trigger('change', { force: true }); 
 
-    cy.get('input[type="password"]')
+    cy.get('input[type="password"]', { timeout: 30000 })
       .should('be.visible')
       .click({ force: true })
       .clear()
@@ -67,7 +73,7 @@ describe('Staff Management Flow', { pageLoadTimeout: 120000 }, () => {
       cy.writeFile('auth_api_status.txt', '1');
     });
 
-    // 🔥 ИСПРАВЛЕННАЯ ЛОГИКА ОЖИДАНИЯ ПЕРЕХОДА:
+    // Логика ожидания перехода:
     cy.url({ timeout: 20000 }).should('not.include', '/sign-in');
     
     // Ждем появления body на дэшборде, чтобы убедиться, что SPA приложение успело сохранить токен
