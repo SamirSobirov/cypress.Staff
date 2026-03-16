@@ -6,10 +6,10 @@ Cypress.on('uncaught:exception', (err, runnable) => {
 describe('Staff Management Flow', { pageLoadTimeout: 120000 }, () => {
   const initialFirstName = 'TestStaff';
   const initialLastName = 'TestStaff';
-  const staffLogin = 'TestStaff9005';
-  const staffEmail = 'TestStaff9005@mail.ru';
+  const staffLogin = 'TestStaff5059005';
+  const staffEmail = 'TestStaff5059005@mail.ru';
   
-  const editedLastName = 'Sobiros';
+  const editedLastName = 'Sobirov';
   const editedFirstName = 'Samir';
 
   before(() => {
