@@ -1,4 +1,4 @@
-// Игнорируем фоновые ошибки самого приложения (частая причина белого экрана в CI)
+// Игнорируем фоновые ошибки самого приложения
 Cypress.on('uncaught:exception', (err, runnable) => {
   return false;
 });
@@ -13,12 +13,10 @@ describe('Staff Management Flow', { pageLoadTimeout: 120000 }, () => {
   const editedFirstName = 'Samir';
 
   before(() => {
-    // Инициализируем файл статуса перед началом теста
     cy.writeFile('auth_api_status.txt', '0');
   });
 
   it('Полный цикл: Авторизация -> Добавление -> Изменение -> Удаление', () => {
-    // Устанавливаем юзер-агент
     cy.visit('https://triple-test.netlify.app/sign-in', { 
       timeout: 120000,
       headers: {
@@ -27,6 +25,14 @@ describe('Staff Management Flow', { pageLoadTimeout: 120000 }, () => {
     });
     
     cy.viewport(1280, 800);
+
+    // =========================================================
+    // 🛡️ ХИТРАЯ ЗАЩИТА ОТ ЗАВИСАНИЯ (Отдаем пустые скрипты)
+    // =========================================================
+    cy.log('🛡️ Подмена скриптов аналитики на пустышки...');
+    cy.intercept('GET', '**/google-analytics.com/**', { statusCode: 200, body: '' });
+    cy.intercept('GET', '**/mc.yandex.ru/**', { statusCode: 200, body: '' });
+    cy.intercept('GET', '**/sentry-cdn.com/**', { statusCode: 200, body: '' });
 
     // =========================================================
     // ШАГ 1: АВТОРИЗАЦИЯ И ПЕРЕХОД
@@ -40,7 +46,6 @@ describe('Staff Management Flow', { pageLoadTimeout: 120000 }, () => {
     cy.wait(3000); 
     cy.get('body').should('be.visible');
 
-    // 🔥 Убрали .trigger('change')
     cy.get('input[type="text"], input[type="email"], input[name="email"], input[name="login"]', { timeout: 45000, includeShadowDom: true })
       .should('exist')
       .first()
@@ -49,16 +54,16 @@ describe('Staff Management Flow', { pageLoadTimeout: 120000 }, () => {
       .clear()
       .type(Cypress.env('LOGIN_EMAIL'), { delay: 50, log: false }); 
 
-    // 🔥 Убрали .trigger('change')
     cy.get('input[type="password"]', { timeout: 30000, includeShadowDom: true })
       .should('be.visible')
       .click({ force: true })
       .clear()
       .type(Cypress.env('LOGIN_PASSWORD'), { delay: 50, log: false });
 
+    // 🔥 ИСПРАВЛЕНИЕ: Убрали force: true, чтобы форма логина не отправлялась дважды
     cy.get('button[type="submit"], button.sign-in-page__submit')
       .should('be.visible')
-      .click({ force: true });
+      .click();
 
     cy.wait('@apiAuth', { timeout: 30000 }).then((interception) => {
       const statusCode = interception.response?.statusCode || 500;
@@ -92,10 +97,8 @@ describe('Staff Management Flow', { pageLoadTimeout: 120000 }, () => {
       .should('be.visible')
       .click({ force: true });
       
-    // 🔥 ДАЕМ ВРЕМЯ NUXT СКАЧАТЬ JS-ЧАНК ДЛЯ ФОРМЫ (чтобы избежать белого экрана с ошибкой 500)
     cy.wait(2500);
 
-    // 🔥 Убрали все .trigger('change')
     cy.get('input[placeholder="Supplier A"]', { timeout: 15000 }).first().should('be.visible').click({ force: true }).clear().type(initialLastName, { delay: 50 });
     cy.get('input[placeholder="Supplier A"]').last().should('be.visible').click({ force: true }).clear().type(initialFirstName, { delay: 50 });
     cy.get('input[placeholder="example@easybooking.com"]').should('be.visible').click({ force: true }).clear().type(staffEmail, { delay: 50 });
@@ -123,15 +126,10 @@ describe('Staff Management Flow', { pageLoadTimeout: 120000 }, () => {
 
     cy.wait(1500); 
 
-    cy.screenshot('1-before-create-click');
-
     cy.contains('button', /Создать|Create|Add/i, { timeout: 15000 })
       .should('be.visible')
       .should('not.be.disabled') 
       .click({ force: true });
-
-    cy.wait(1500);
-    cy.screenshot('2-after-create-click');
 
     cy.contains('Сотрудник добавлен', { timeout: 20000 })
       .should('be.visible');
@@ -158,7 +156,6 @@ describe('Staff Management Flow', { pageLoadTimeout: 120000 }, () => {
       .should('be.visible')
       .click({ force: true });
 
-    // 🔥 Убрали .trigger('change')
     cy.get('input[type="text"]', { timeout: 10000 }).eq(0)
       .should('be.visible')
       .click({ force: true })
