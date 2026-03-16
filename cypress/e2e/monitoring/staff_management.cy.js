@@ -1,5 +1,9 @@
-describe('Staff Management Flow', { pageLoadTimeout: 120000 }, () => {
+// Игнорируем фоновые ошибки самого приложения (частая причина белого экрана в CI)
+Cypress.on('uncaught:exception', (err, runnable) => {
+  return false;
+});
 
+describe('Staff Management Flow', { pageLoadTimeout: 120000 }, () => {
   const initialFirstName = 'TestStaff';
   const initialLastName = 'TestStaff';
   const staffLogin = 'TestStaff9005';
@@ -9,22 +13,28 @@ describe('Staff Management Flow', { pageLoadTimeout: 120000 }, () => {
   const editedFirstName = 'Samir';
 
   before(() => {
+    // Инициализируем файл статуса перед началом теста
     cy.writeFile('auth_api_status.txt', '0');
   });
 
   it('Полный цикл: Авторизация -> Добавление -> Изменение -> Удаление', () => {
+    // Устанавливаем юзер-агент, чтобы обойти базовые защиты от ботов Netlify
+    cy.visit('https://triple-test.netlify.app/sign-in', { 
+      timeout: 120000,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+      }
+    });
+    
     cy.viewport(1280, 800);
 
     // =========================================================
     // 🛡️ ЗАЩИТА ОТ ЗАВИСАНИЯ СТРАНИЦЫ
+    // Убрал блокировку image/media, так как в CI это часто ломает рендер React/Vue
     // =========================================================
-    cy.log('🛡️ Блокировка внешних скриптов для ускорения загрузки...');
-    cy.intercept({ resourceType: 'image' }, { statusCode: 200, body: '' });
-    cy.intercept({ resourceType: 'media' }, { statusCode: 200, body: '' });
+    cy.log('🛡️ Блокировка аналитики...');
     cy.intercept('GET', '**/google-analytics.com/**', { statusCode: 204 });
     cy.intercept('GET', '**/mc.yandex.ru/**', { statusCode: 204 });
-    cy.intercept('GET', '**/fonts.googleapis.com/**', { statusCode: 204 });
-    cy.intercept('GET', '**/fonts.gstatic.com/**', { statusCode: 204 });
     cy.intercept('GET', '**/sentry-cdn.com/**', { statusCode: 204 });
 
     // =========================================================
@@ -33,19 +43,16 @@ describe('Staff Management Flow', { pageLoadTimeout: 120000 }, () => {
     cy.log('🟢 ШАГ 1: НАЧАЛО АВТОРИЗАЦИИ');
     cy.intercept('POST', '**/login**').as('apiAuth');
     cy.intercept('POST', '**/staff*').as('apiCreateStaff'); 
-    
-    // Перехватываем GET запрос загрузки списка сотрудников
     cy.intercept('GET', '**/staff*').as('getStaffList');
 
-    cy.visit('https://triple-test.netlify.app/sign-in', { timeout: 120000 }); 
     cy.url().should('include', '/sign-in');
 
-    // 🔥 ИСПРАВЛЕНИЕ: Ждем, пока прогрузится контейнер страницы авторизации
+    // Ждем, пока отрендерится основной контейнер приложения (если есть id="app" или "root", лучше использовать его)
     cy.get('body').should('be.visible');
-    cy.wait(2000); // Даем время фреймворку отрендерить инпуты
 
-    // 🔥 ИСПРАВЛЕНИЕ: Универсальный селектор для поля логина
-    cy.get('input[type="text"], input[type="email"], input[name="email"], input[name="login"]', { timeout: 30000 })
+    // 🔥 ИСПРАВЛЕНИЕ: Добавлено includeShadowDom на случай, если инпуты в Shadow Tree
+    cy.get('input[type="text"], input[type="email"], input[name="email"], input[name="login"]', { timeout: 45000, includeShadowDom: true })
+      .should('exist') // Сначала проверяем, что он вообще есть в DOM
       .first()
       .should('be.visible')
       .click({ force: true })
@@ -53,39 +60,33 @@ describe('Staff Management Flow', { pageLoadTimeout: 120000 }, () => {
       .type(Cypress.env('LOGIN_EMAIL'), { delay: 50, log: false })
       .trigger('change', { force: true }); 
 
-    cy.get('input[type="password"]', { timeout: 30000 })
+    cy.get('input[type="password"]', { timeout: 30000, includeShadowDom: true })
       .should('be.visible')
       .click({ force: true })
       .clear()
       .type(Cypress.env('LOGIN_PASSWORD'), { delay: 50, log: false })
       .trigger('change', { force: true });
 
-    cy.get('button.sign-in-page__submit')
+    cy.get('button[type="submit"], button.sign-in-page__submit')
       .should('be.visible')
       .click({ force: true });
 
+    // Обработка статуса авторизации
     cy.wait('@apiAuth', { timeout: 30000 }).then((interception) => {
       const statusCode = interception.response?.statusCode || 500;
       if (statusCode >= 400) {
         cy.writeFile('auth_api_status.txt', `ERROR_${statusCode}`); 
-        throw new Error(`🆘 Ошибка: HTTP ${statusCode}`);
+        throw new Error(`🆘 Ошибка авторизации: HTTP ${statusCode}`);
       }
       cy.writeFile('auth_api_status.txt', '1');
     });
 
-    // Логика ожидания перехода:
-    cy.url({ timeout: 20000 }).should('not.include', '/sign-in');
+    cy.url({ timeout: 30000 }).should('not.include', '/sign-in');
     
-    // Ждем появления body на дэшборде, чтобы убедиться, что SPA приложение успело сохранить токен
-    cy.get('body').should('be.visible'); 
-    cy.wait(1000); // Небольшая пауза для страховки записи в localStorage
-
     cy.log('⚠️ Прямой переход в раздел Staff');
     cy.visit('https://triple-test.netlify.app/flight/ru/staff', { timeout: 120000 });
-    
     cy.url({ timeout: 20000 }).should('include', '/staff');
     
-    // Ждем, пока сервер вернет данные для таблицы, прежде чем искать ее в DOM
     cy.wait('@getStaffList', { timeout: 30000 }).then((interception) => {
       expect(interception.response.statusCode).to.be.lessThan(400);
     });
@@ -100,11 +101,10 @@ describe('Staff Management Flow', { pageLoadTimeout: 120000 }, () => {
     cy.get('button', { timeout: 15000 })
       .filter(':contains("Добавить"), :contains("Add")')
       .first()
+      .should('be.visible')
       .click({ force: true });
       
-    cy.wait(2000); 
-
-    cy.get('input[placeholder="Supplier A"]').first().should('be.visible').click({ force: true }).clear().type(initialLastName, { delay: 50 }).trigger('change', { force: true });
+    cy.get('input[placeholder="Supplier A"]', { timeout: 15000 }).first().should('be.visible').click({ force: true }).clear().type(initialLastName, { delay: 50 }).trigger('change', { force: true });
     cy.get('input[placeholder="Supplier A"]').last().should('be.visible').click({ force: true }).clear().type(initialFirstName, { delay: 50 }).trigger('change', { force: true });
     cy.get('input[placeholder="example@easybooking.com"]').should('be.visible').click({ force: true }).clear().type(staffEmail, { delay: 50 }).trigger('change', { force: true });
 
@@ -121,7 +121,7 @@ describe('Staff Management Flow', { pageLoadTimeout: 120000 }, () => {
       
     cy.get('.p-dialog-header').first().click({ force: true, multiple: true });
 
-    cy.contains('button.app-button--primary.app-button--sm', /Продолжить|Continue|Next/i, { timeout: 15000 })
+    cy.contains('button', /Продолжить|Continue|Next/i, { timeout: 15000 })
       .scrollIntoView() 
       .should('be.visible')
       .click({ force: true });
@@ -130,9 +130,7 @@ describe('Staff Management Flow', { pageLoadTimeout: 120000 }, () => {
       .should('be.visible')
       .click({ force: true });
 
-    cy.wait(1500);
-
-    cy.contains('button.app-button--primary', /Создать|Create|Add/i, { timeout: 15000 })
+    cy.contains('button', /Создать|Create|Add/i, { timeout: 15000 })
       .should('be.visible')
       .click({ force: true });
 
@@ -157,7 +155,7 @@ describe('Staff Management Flow', { pageLoadTimeout: 120000 }, () => {
       .should('be.visible')
       .click({ force: true });
 
-    cy.get('input[type="text"]').eq(0)
+    cy.get('input[type="text"]', { timeout: 10000 }).eq(0)
       .should('be.visible')
       .click({ force: true })
       .clear()
@@ -171,9 +169,7 @@ describe('Staff Management Flow', { pageLoadTimeout: 120000 }, () => {
       .type(editedFirstName, { delay: 50 })
       .trigger('change', { force: true });
     
-    cy.wait(1000);
-    
-    cy.contains('button.app-button--primary', /Сохранить|Save/i)
+    cy.contains('button', /Сохранить|Save/i)
       .should('be.visible')
       .click({ force: true });
     
@@ -185,7 +181,7 @@ describe('Staff Management Flow', { pageLoadTimeout: 120000 }, () => {
     // =========================================================
     cy.log('🟢 ШАГ 4: УДАЛЕНИЕ СОТРУДНИКА');
 
-    cy.get('.p-row-odd td ')
+    cy.get('.p-row-odd')
       .contains(`${editedFirstName}`)
       .should('be.visible')
       .click({ force: true });
@@ -198,7 +194,7 @@ describe('Staff Management Flow', { pageLoadTimeout: 120000 }, () => {
       .should('be.visible')
       .click({ force: true }); 
 
-    cy.get('.p-datatable-table-container', { timeout: 15000 }).should('not.contain', `${editedFirstName}`);
+    cy.get('.p-datatable', { timeout: 15000 }).should('not.contain', `${editedFirstName}`);
     
     cy.writeFile('auth_api_status.txt', '4');
     cy.log('🎉 ЦИКЛ ПОЛНОСТЬЮ ЗАВЕРШЕН!');

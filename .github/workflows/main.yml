@@ -20,10 +20,10 @@ jobs:
       - name: Cypress run
         uses: cypress-io/github-action@v6
         with:
-          # ВНИМАНИЕ: Проверь, чтобы путь к файлу теста соответствовал структуре твоего проекта!
           spec: cypress/e2e/monitoring/staff_management.cy.js 
           browser: chrome
         env:
+          # Cypress автоматически подтянет переменные с префиксом CYPRESS_
           CYPRESS_LOGIN_EMAIL: ${{ secrets.LOGIN_EMAIL }}
           CYPRESS_LOGIN_PASSWORD: ${{ secrets.LOGIN_PASSWORD }}
         continue-on-error: true
@@ -31,48 +31,50 @@ jobs:
       - name: Parse Diagnostic Data
         if: always()
         run: |
-          # Читаем результат из файла, который создал Cypress
+          # Проверяем наличие файла и читаем его, убирая лишние пробелы/переносы
           if [ -f auth_api_status.txt ]; then
             RESULT=$(cat auth_api_status.txt | tr -d '[:space:]')
           else
             RESULT="UNKNOWN"
           fi
 
-          # Настройка стартовых индикаторов (по умолчанию показываем часы)
+          # Настройка стартовых индикаторов
           S1="⏳"; S2="⏳"; S3="⏳"; S4="⏳"; STATUS="🔴 Failed"
 
-          # Расшифровка этапов из твоего Cypress-кода
-          if [[ "$RESULT" == "0" ]]; then S1="❌"; STATUS="❌ UI Crash at Auth"; fi
-          if [[ "$RESULT" == "1" ]]; then S1="✅"; S2="❌"; STATUS="⚠️ Failed at Create"; fi
-          if [[ "$RESULT" == "2" ]]; then S1="✅"; S2="✅"; S3="❌"; STATUS="⚠️ Failed at Edit"; fi
-          if [[ "$RESULT" == "3" ]]; then S1="✅"; S2="✅"; S3="✅"; S4="❌"; STATUS="⚠️ Failed at Delete"; fi
-          if [[ "$RESULT" == "4" ]]; then S1="✅"; S2="✅"; S3="✅"; S4="✅"; STATUS="🟢 Success"; fi
-          if [[ "$RESULT" == ERROR_* ]]; then S1="🆘 ${RESULT}"; STATUS="🔴 Auth API Error"; fi
-          if [[ "$RESULT" == "UNKNOWN" ]]; then STATUS="❌ Unknown Failure / File Missing"; fi
+          # Расшифровка этапов
+          case "$RESULT" in
+            "0") S1="❌"; STATUS="❌ UI Crash at Auth" ;;
+            "1") S1="✅"; S2="❌"; STATUS="⚠️ Failed at Create" ;;
+            "2") S1="✅"; S2="✅"; S3="❌"; STATUS="⚠️ Failed at Edit" ;;
+            "3") S1="✅"; S2="✅"; S3="✅"; S4="❌"; STATUS="⚠️ Failed at Delete" ;;
+            "4") S1="✅"; S2="✅"; S3="✅"; S4="✅"; STATUS="🟢 Success" ;;
+            ERROR_*) S1="🆘 ${RESULT}"; STATUS="🔴 Auth API Error" ;;
+            *) STATUS="❌ Unknown Failure / File Missing" ;;
+          esac
 
-          # Передаем переменные в окружение GitHub Actions для Telegram
+          # Передаем переменные в GITHUB_ENV
           echo "S1=$S1" >> $GITHUB_ENV
           echo "S2=$S2" >> $GITHUB_ENV
           echo "S3=$S3" >> $GITHUB_ENV
           echo "S4=$S4" >> $GITHUB_ENV
           echo "FINAL_STATUS=$STATUS" >> $GITHUB_ENV
 
-      - name: Upload Cypress Screenshots
+      - name: Upload Cypress Screenshots & Videos
         uses: actions/upload-artifact@v4
         if: failure() || always()
         with:
-          name: cypress-screenshots
-          path: cypress/screenshots/
+          name: cypress-artifacts
+          # Сохраняем и скрины, и видео, чтобы точно увидеть, что было на экране
+          path: |
+            cypress/screenshots/
+            cypress/videos/
           if-no-files-found: ignore
 
       - name: Send Telegram Notification
         if: always()
         uses: appleboy/telegram-action@master
         with:
-          to: >-
-            ${{ (github.event.inputs.user_chat_id != '') && 
-            github.event.inputs.user_chat_id || 
-            secrets.TELEGRAM_CHAT_ID }}
+          to: ${{ github.event.inputs.user_chat_id != '' && github.event.inputs.user_chat_id || secrets.TELEGRAM_CHAT_ID }}
           token: ${{ secrets.TELEGRAM_TOKEN }} 
           format: markdown
           message: |
