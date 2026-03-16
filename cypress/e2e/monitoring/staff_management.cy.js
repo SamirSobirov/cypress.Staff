@@ -6,7 +6,7 @@ Cypress.on('uncaught:exception', (err, runnable) => {
 describe('Staff Management Flow', { pageLoadTimeout: 120000 }, () => {
   const initialFirstName = 'TestStaff';
   const initialLastName = 'TestStaff';
-const staffLogin = 'TestStaff777111';
+  const staffLogin = 'TestStaff777111';
   const staffEmail = 'TestStaff777111@mail.ru';
   
   const editedLastName = 'Sobirov';
@@ -29,14 +29,6 @@ const staffLogin = 'TestStaff777111';
     cy.viewport(1280, 800);
 
     // =========================================================
-    // 🛡️ ЗАЩИТА ОТ ЗАВИСАНИЯ СТРАНИЦЫ
-    // =========================================================
-    cy.log('🛡️ Блокировка аналитики...');
-    cy.intercept('GET', '**/google-analytics.com/**', { statusCode: 204 });
-    cy.intercept('GET', '**/mc.yandex.ru/**', { statusCode: 204 });
-    cy.intercept('GET', '**/sentry-cdn.com/**', { statusCode: 204 });
-
-    // =========================================================
     // ШАГ 1: АВТОРИЗАЦИЯ И ПЕРЕХОД
     // =========================================================
     cy.log('🟢 ШАГ 1: НАЧАЛО АВТОРИЗАЦИИ');
@@ -45,6 +37,8 @@ const staffLogin = 'TestStaff777111';
 
     cy.url().should('include', '/sign-in');
 
+    // Даем приложению время загрузить все скрипты и отрендерить страницу
+    cy.wait(3000); 
     cy.get('body').should('be.visible');
 
     cy.get('input[type="text"], input[type="email"], input[name="email"], input[name="login"]', { timeout: 45000, includeShadowDom: true })
@@ -190,6 +184,7 @@ const staffLogin = 'TestStaff777111';
     // =========================================================
     cy.log('🟢 ШАГ 4: УДАЛЕНИЕ СОТРУДНИКА');
 
+    // Заменил .p-row-odd на универсальный селектор строки
     cy.get('.p-row-odd')
       .contains(`${editedFirstName}`)
       .should('be.visible')
