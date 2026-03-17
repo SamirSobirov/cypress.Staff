@@ -125,19 +125,20 @@ describe('Staff Management Flow', { pageLoadTimeout: 120000 }, () => {
       .should('be.visible')
       .click({ force: true });
 
-    // 🛑 СБРОС ФОКУСА: Кликаем в пустоту модалки, чтобы разблокировать кнопку сохранения
+ // СБРОС ФОКУСА: Кликаем в пустоту модалки
     cy.get('.p-dialog-header').first().click({ force: true });
     cy.wait(1500); 
 
-    // 🛑 КЛИК БЕЗ FORCE:
+    // ✅ ВОЗВРАЩАЕМ { force: true } для обхода перекрытия маской (p-dialog-mask)
     cy.contains('button', /Создать|Create|Add/i, { timeout: 15000 })
       .scrollIntoView()
       .should('be.visible')
       .should('not.be.disabled') 
-      .click();
+      .click({ force: true });
 
+    // 1. Убеждаемся, что модальное окно создания закрылось
     cy.get('.p-dialog', { timeout: 15000 }).should('not.exist');
-    cy.wait(2000); 
+    cy.wait(2000);
 
     // 🔍 ПОИСК: Ищем по УНИКАЛЬНОМУ ИМЕНИ (initialFirstName)
     cy.get('input[placeholder*="Поиск"], input[placeholder*="Search"]', { timeout: 10000 })
