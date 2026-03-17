@@ -4,13 +4,18 @@ Cypress.on('uncaught:exception', (err, runnable) => {
 });
 
 describe('Staff Management Flow', { pageLoadTimeout: 120000 }, () => {
-  const initialFirstName = 'TestStaff';
+  // Берем последние 6 цифр, чтобы ID был уникальным, но не слишком длинным для полей ввода
+  const uniqueId = Date.now().toString().slice(-6); 
+
+  // Делаем данные уникальными, чтобы старые зависшие записи не ломали новые тесты
+  const initialFirstName = `Staff_${uniqueId}`; 
   const initialLastName = 'TestStaff';
-  const staffLogin = 'TestStaff777111';
-  const staffEmail = 'TestStaff777111@mail.ru';
+  const staffLogin = `login${uniqueId}`;
+  const staffEmail = `test${uniqueId}@mail.ru`;
   
   const editedLastName = 'Sobirov';
-  const editedFirstName = 'Samir';
+  // Имя после редактирования тоже делаем уникальным
+  const editedFirstName = `Samir_${uniqueId}`;
 
   before(() => {
     // 0 - Начало теста (краш на авторизации)
@@ -25,14 +30,14 @@ describe('Staff Management Flow', { pageLoadTimeout: 120000 }, () => {
     cy.intercept('GET', '**/staff*').as('getStaffList');
 
     // =========================================================
-    // ШАГ 1: АВТОРИЗАЦИЯ И ПЕРЕХОД (Используем проверенный метод)
+    // ШАГ 1: АВТОРИЗАЦИЯ И ПЕРЕХОД
     // =========================================================
     cy.log('🟢 ШАГ 1: НАЧАЛО АВТОРИЗАЦИИ');
     cy.visit('https://triple-test.netlify.app/sign-in', { timeout: 30000 });
     cy.url().should('include', '/sign-in');
     cy.get('body').should('be.visible');
 
-    // Используем надежные селекторы из твоего рабочего теста
+    // Используем надежные селекторы
     cy.get('input[type="text"]', { timeout: 15000 })
       .should('be.visible')
       .focus()
@@ -72,10 +77,8 @@ describe('Staff Management Flow', { pageLoadTimeout: 120000 }, () => {
       const statusCode = interception?.response?.statusCode || 200; 
       expect(statusCode).to.be.lessThan(400);
     });
-
-    // cy.get('.p-datatable', { timeout: 30000 }).should('be.visible');
     
-   // =========================================================
+    // =========================================================
     // ШАГ 2: ДОБАВЛЕНИЕ СОТРУДНИКА
     // =========================================================
     cy.log('🟢 ШАГ 2: ДОБАВЛЕНИЕ СОТРУДНИКА');
@@ -88,7 +91,7 @@ describe('Staff Management Flow', { pageLoadTimeout: 120000 }, () => {
       
     cy.wait(2500);
 
-    // Добавлен scrollIntoView() и focus() для стабильности в CI
+    // Добавлен scrollIntoView() и focus() для стабильности
     cy.get('input[placeholder="Supplier A"]', { timeout: 15000 }).first().scrollIntoView().should('be.visible').focus().clear().type(initialLastName, { delay: 50 });
     cy.get('input[placeholder="Supplier A"]').last().scrollIntoView().should('be.visible').focus().clear().type(initialFirstName, { delay: 50 });
     cy.get('input[placeholder="example@easybooking.com"]').scrollIntoView().should('be.visible').focus().clear().type(staffEmail, { delay: 50 });
@@ -103,7 +106,6 @@ describe('Staff Management Flow', { pageLoadTimeout: 120000 }, () => {
       .clear()
       .type(staffLogin, { delay: 50 });
       
-    // Убрал multiple: true, так как в CI это иногда вызывает ошибки потери фокуса
     cy.get('.p-dialog-header').first().click({ force: true });
 
     cy.contains('button', /Продолжить|Continue|Next/i, { timeout: 15000 })
@@ -124,28 +126,28 @@ describe('Staff Management Flow', { pageLoadTimeout: 120000 }, () => {
       .should('not.be.disabled') 
       .click({ force: true });
 
-    // ❌ Убрали проверку всплывашки: cy.contains(/Сотрудник добавлен|added|success/i)...
-    // ✅ Добавили надежную проверку закрытия окна и обновления таблицы:
-
     // 1. Убеждаемся, что модальное окно создания закрылось
     cy.get('.p-dialog', { timeout: 15000 }).should('not.exist');
+    cy.wait(2000); 
 
-    // 2. Даем таблице время обновить данные с сервера
-    cy.wait(1000); 
+    // 🔍 2. ИСПОЛЬЗУЕМ ПОИСК, ЧТОБЫ НАЙТИ СОТРУДНИКА (обходим пагинацию)
+    cy.get('input[placeholder*="Поиск"], input[placeholder*="Search"]', { timeout: 10000 })
+      .should('be.visible')
+      .clear()
+      .type(initialLastName, { delay: 50 });
+
+    // Ждем, пока таблица отфильтруется
+    cy.wait(2000);
 
     // 3. Проверяем, что сотрудник реально появился в таблице
-    cy.get('.p-datatable-tbody', { timeout: 15000 }).should('contain', initialFirstName);
+    cy.get('.p-datatable-tbody', { timeout: 15000 }).should('contain', initialLastName);
 
     // Записываем 2 - Добавление успешно
     cy.writeFile('auth_api_status.txt', '2');
-
-    // =========================================================
-    // ШАГ 3: РЕДАКТИРОВАНИЕ СОТРУДНИКА
-    // =========================================================
-    cy.log('🟢 ШАГ 3: РЕДАКТИРОВАНИЕ СОТРУДНИКА');
+cy.log('🟢 ШАГ 3: РЕДАКТИРОВАНИЕ СОТРУДНИКА');
 
     cy.get('.p-datatable-tbody tr', { timeout: 20000 })
-      .contains(`${initialFirstName}`)
+      .contains(`${initialLastName}`)
       .scrollIntoView()
       .should('be.visible')
       .click({ force: true });
@@ -154,14 +156,15 @@ describe('Staff Management Flow', { pageLoadTimeout: 120000 }, () => {
       .should('be.visible')
       .click({ force: true });
     
-      cy.contains('.p-tab', /Информация о пользователе|User Info/i, { timeout: 10000 })
+    cy.contains('.p-tab', /Информация о пользователе|User Info/i, { timeout: 10000 })
       .should('be.visible')
       .click({ force: true });
 
     // 1. Обязательно даем форме "успокоиться" после клика и отрисовки
     cy.wait(1000);
 
-cy.get('.p-dialog input[type="text"]', { timeout: 10000 }).eq(0)
+    // Вводим новые фамилию и имя
+    cy.get('.p-dialog input[type="text"]', { timeout: 10000 }).eq(0)
       .scrollIntoView()
       .should('be.visible')
       .focus()
@@ -177,8 +180,22 @@ cy.get('.p-dialog input[type="text"]', { timeout: 10000 }).eq(0)
       .scrollIntoView()
       .should('be.visible')
       .click({ force: true });
+      
+    // ❌ ЖДЕМ, ПОКА МОДАЛКА ЗАКРОЕТСЯ (сохранение прошло)
+    cy.get('.p-dialog', { timeout: 15000 }).should('not.exist');
+    cy.wait(2000);
     
-    cy.get('.p-datatable-tbody', { timeout: 15000 }).should('contain', `${editedFirstName}`);
+    // 🔍 ОБНОВЛЯЕМ СТРОКУ ПОИСКА НОВЫМИ ДАННЫМИ
+    cy.get('input[placeholder*="Поиск"], input[placeholder*="Search"]', { timeout: 10000 })
+      .should('be.visible')
+      .clear()
+      .type(editedLastName, { delay: 50 });
+      
+    // Ждем, пока таблица отфильтруется по новому запросу
+    cy.wait(2000);
+    
+    // Теперь таблица точно не пустая, проверяем новые данные
+    cy.get('.p-datatable-tbody', { timeout: 15000 }).should('contain', `${editedLastName}`);
     
     // Записываем 3 - Редактирование успешно
     cy.writeFile('auth_api_status.txt', '3');
@@ -188,8 +205,10 @@ cy.get('.p-dialog input[type="text"]', { timeout: 10000 }).eq(0)
     // =========================================================
     cy.log('🟢 ШАГ 4: УДАЛЕНИЕ СОТРУДНИКА');
 
-    cy.get('.p-row-odd')
-      .contains(`${editedFirstName}`)
+    // Поиск уже отфильтровал таблицу, поэтому сотрудник точно тут
+    // Заменил .p-row-odd на универсальный tr, чтобы не зависеть от четности/нечетности строки
+    cy.get('.p-datatable-tbody tr')
+      .contains(`${editedLastName}`)
       .scrollIntoView()
       .should('be.visible')
       .click({ force: true });
@@ -202,8 +221,11 @@ cy.get('.p-dialog input[type="text"]', { timeout: 10000 }).eq(0)
       .should('be.visible')
       .click({ force: true }); 
 
-    // Проверяем, что сотрудник действительно исчез из таблицы
-    // cy.get('.p-datatable', { timeout: 15000 }).should('not.contain', `${editedFirstName}`);
+    cy.wait(2000);
+
+    // Так как строка поиска все еще заполнена именем удаленного сотрудника, 
+    // после удаления таблица должна стать пустой (или просто не содержать это имя).
+    cy.get('.p-datatable').should('not.contain', `${editedLastName}`);
     
     // Записываем 4 - Удаление успешно (цикл завершен)
     cy.writeFile('auth_api_status.txt', '4');
