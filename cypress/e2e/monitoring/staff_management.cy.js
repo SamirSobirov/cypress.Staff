@@ -4,24 +4,24 @@ Cypress.on('uncaught:exception', (err, runnable) => {
 });
 
 describe('Staff Management Flow', { pageLoadTimeout: 120000 }, () => {
-  // Берем последние 6 цифр, чтобы ID был уникальным, но не слишком длинным для полей ввода
-const uniqueId = Math.floor(Math.random() * 10000000); 
+  // Генерируем 100% случайное число, чтобы избежать конфликтов при запуске по крону
+  const uniqueId = Math.floor(Math.random() * 10000000); 
 
-  // Делаем данные 100% уникальными для каждого прогона
+  // Делаем данные уникальными для каждого прогона
   const initialFirstName = `Staff_${uniqueId}`; 
   const initialLastName = 'TestStaff';
   const staffLogin = `login${uniqueId}`;
   const staffEmail = `test${uniqueId}@mail.ru`;
   
   const editedLastName = 'Sobirov';
+  // Имя после редактирования тоже делаем уникальным, чтобы при удалении не удалить чужого
   const editedFirstName = `Samir_${uniqueId}`;
+
   before(() => {
-    // 0 - Начало теста (краш на авторизации)
     cy.writeFile('auth_api_status.txt', '0');
   });
 
   it('Полный цикл: Авторизация -> Добавление -> Изменение -> Удаление', () => {
-    // Задаем viewport ДО перехода, как в рабочем тесте
     cy.viewport(1280, 800);
 
     cy.intercept('POST', '**/login**').as('apiAuth');
@@ -30,23 +30,20 @@ const uniqueId = Math.floor(Math.random() * 10000000);
     // =========================================================
     // ШАГ 1: АВТОРИЗАЦИЯ И ПЕРЕХОД
     // =========================================================
-   cy.log('🟢 ШАГ 1: НАЧАЛО АВТОРИЗАЦИИ');
+    cy.log('🟢 ШАГ 1: НАЧАЛО АВТОРИЗАЦИИ');
 
-    // 🧹 ОЧИСТКА СОСТОЯНИЯ: убиваем старые куки и локалсторадж, 
-    // чтобы приложение грузилось "с чистого листа" и не выдавало белый экран.
+    // Очистка состояния перед стартом
     cy.clearCookies();
     cy.clearLocalStorage();
     cy.window().then((win) => {
       win.sessionStorage.clear();
     });
 
-    // Используем простой визит, как в твоем первом рабочем тесте (без headers!)
     cy.visit('https://triple-test.netlify.app/sign-in', { timeout: 30000 });
     
     cy.url().should('include', '/sign-in');
     cy.get('body').should('be.visible');
 
-    // Возвращаем тот самый селектор, который у тебя изначально отлично работал
     cy.get('input[type="text"]', { timeout: 15000 })
       .should('be.visible')
       .focus()
@@ -74,13 +71,11 @@ const uniqueId = Math.floor(Math.random() * 10000000);
     });
 
     cy.url({ timeout: 30000 }).should('not.include', '/sign-in');
-    
-    // Записываем 1 - Авторизация успешна
     cy.writeFile('auth_api_status.txt', '1');
 
     cy.log('⚠️ Прямой переход в раздел Staff');
     
-    // 🛑 Оставляем паузу ЗДЕСЬ, чтобы после логина токены успели сохраниться
+    // Даем время на сохранение токенов
     cy.wait(4000); 
 
     cy.visit('https://triple-test.netlify.app/flight/ru/staff', { timeout: 120000 });
@@ -90,6 +85,7 @@ const uniqueId = Math.floor(Math.random() * 10000000);
       const statusCode = interception?.response?.statusCode || 200; 
       expect(statusCode).to.be.lessThan(400);
     });
+
     // =========================================================
     // ШАГ 2: ДОБАВЛЕНИЕ СОТРУДНИКА
     // =========================================================
@@ -103,7 +99,6 @@ const uniqueId = Math.floor(Math.random() * 10000000);
       
     cy.wait(2500);
 
-    // Добавлен scrollIntoView() и focus() для стабильности
     cy.get('input[placeholder="Supplier A"]', { timeout: 15000 }).first().scrollIntoView().should('be.visible').focus().clear().type(initialLastName, { delay: 50 });
     cy.get('input[placeholder="Supplier A"]').last().scrollIntoView().should('be.visible').focus().clear().type(initialFirstName, { delay: 50 });
     cy.get('input[placeholder="example@easybooking.com"]').scrollIntoView().should('be.visible').focus().clear().type(staffEmail, { delay: 50 });
@@ -130,31 +125,30 @@ const uniqueId = Math.floor(Math.random() * 10000000);
       .should('be.visible')
       .click({ force: true });
 
+    // 🛑 СБРОС ФОКУСА: Кликаем в пустоту модалки, чтобы разблокировать кнопку сохранения
+    cy.get('.p-dialog-header').first().click({ force: true });
     cy.wait(1500); 
 
+    // 🛑 КЛИК БЕЗ FORCE:
     cy.contains('button', /Создать|Create|Add/i, { timeout: 15000 })
       .scrollIntoView()
       .should('be.visible')
       .should('not.be.disabled') 
-      .click({ force: true });
+      .click();
 
-    // 1. Убеждаемся, что модальное окно создания закрылось
     cy.get('.p-dialog', { timeout: 15000 }).should('not.exist');
     cy.wait(2000); 
 
-    // 🔍 2. ИСПОЛЬЗУЕМ ПОИСК, ЧТОБЫ НАЙТИ СОТРУДНИКА (обходим пагинацию)
+    // 🔍 ПОИСК: Ищем по УНИКАЛЬНОМУ ИМЕНИ (initialFirstName)
     cy.get('input[placeholder*="Поиск"], input[placeholder*="Search"]', { timeout: 10000 })
       .should('be.visible')
       .clear()
       .type(initialLastName, { delay: 50 });
 
-    // Ждем, пока таблица отфильтруется
     cy.wait(2000);
 
-    // 3. Проверяем, что сотрудник реально появился в таблице
+    // Проверяем уникальное имя
     cy.get('.p-datatable-tbody', { timeout: 15000 }).should('contain', initialLastName);
-
-    // Записываем 2 - Добавление успешно
     cy.writeFile('auth_api_status.txt', '2');
 
     // =========================================================
@@ -163,7 +157,7 @@ const uniqueId = Math.floor(Math.random() * 10000000);
     cy.log('🟢 ШАГ 3: РЕДАКТИРОВАНИЕ СОТРУДНИКА');
 
     cy.get('.p-datatable-tbody tr', { timeout: 20000 })
-      .contains(`${initialLastName}`)
+      .contains(initialLastName)
       .scrollIntoView()
       .should('be.visible')
       .click({ force: true });
@@ -176,10 +170,8 @@ const uniqueId = Math.floor(Math.random() * 10000000);
       .should('be.visible')
       .click({ force: true });
 
-    // 1. Обязательно даем форме "успокоиться" после клика и отрисовки
     cy.wait(1000);
 
-    // Вводим новые фамилию и имя
     cy.get('.p-dialog input[type="text"]', { timeout: 10000 }).eq(0)
       .scrollIntoView()
       .should('be.visible')
@@ -197,23 +189,18 @@ const uniqueId = Math.floor(Math.random() * 10000000);
       .should('be.visible')
       .click({ force: true });
       
-    // ❌ ЖДЕМ, ПОКА МОДАЛКА ЗАКРОЕТСЯ (сохранение прошло)
     cy.get('.p-dialog', { timeout: 15000 }).should('not.exist');
     cy.wait(2000);
     
-    // 🔍 ОБНОВЛЯЕМ СТРОКУ ПОИСКА НОВЫМИ ДАННЫМИ
+    // 🔍 ПОИСК ПОСЛЕ РЕДАКТИРОВАНИЯ: Ищем по НОВОМУ УНИКАЛЬНОМУ ИМЕНИ (editedFirstName)
     cy.get('input[placeholder*="Поиск"], input[placeholder*="Search"]', { timeout: 10000 })
       .should('be.visible')
       .clear()
       .type(editedLastName, { delay: 50 });
       
-    // Ждем, пока таблица отфильтруется по новому запросу
     cy.wait(2000);
     
-    // Теперь таблица точно не пустая, проверяем новые данные
-    cy.get('.p-datatable-tbody', { timeout: 15000 }).should('contain', `${editedLastName}`);
-    
-    // Записываем 3 - Редактирование успешно
+    cy.get('.p-datatable-tbody', { timeout: 15000 }).should('contain', editedLastName);
     cy.writeFile('auth_api_status.txt', '3');
 
     // =========================================================
@@ -221,9 +208,8 @@ const uniqueId = Math.floor(Math.random() * 10000000);
     // =========================================================
     cy.log('🟢 ШАГ 4: УДАЛЕНИЕ СОТРУДНИКА');
 
-    // Поиск уже отфильтровал таблицу, поэтому сотрудник точно тут
     cy.get('.p-datatable-tbody tr')
-      .contains(`${editedLastName}`)
+      .contains(editedLastName)
       .scrollIntoView()
       .should('be.visible')
       .click({ force: true });
@@ -238,11 +224,8 @@ const uniqueId = Math.floor(Math.random() * 10000000);
 
     cy.wait(2000);
 
-    // Так как строка поиска все еще заполнена именем удаленного сотрудника, 
-    // после удаления таблица должна стать пустой (или просто не содержать это имя).
-    cy.get('.p-datatable').should('not.contain', `${editedLastName}`);
+    cy.get('.p-datatable').should('not.contain', editedLastName);
     
-    // Записываем 4 - Удаление успешно (цикл завершен)
     cy.writeFile('auth_api_status.txt', '4');
     cy.log('🎉 ЦИКЛ ПОЛНОСТЬЮ ЗАВЕРШЕН!');
   });
