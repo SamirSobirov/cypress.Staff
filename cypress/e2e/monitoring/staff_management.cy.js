@@ -4,17 +4,17 @@ Cypress.on('uncaught:exception', (err, runnable) => {
 });
 
 describe('Staff Management Flow', { pageLoadTimeout: 120000 }, () => {
-  // Генерируем 100% случайное число, чтобы избежать конфликтов при запуске по крону
-  const uniqueId = Math.floor(Math.random() * 10000000); 
+  // Генерируем уникальную строку (буквы + цифры), чтобы сервер точно не ругался на формат
+  const uniqueId = Math.random().toString(36).substring(2, 8); 
 
-  // Делаем данные уникальными для каждого прогона
+  // Делаем данные 100% уникальными для каждого прогона
   const initialFirstName = `Staff_${uniqueId}`; 
   const initialLastName = 'TestStaff';
-  const staffLogin = `login${uniqueId}`;
-  const staffEmail = `test${uniqueId}@mail.ru`;
+  const staffLogin = `login_${uniqueId}`;
+  const staffEmail = `test_${uniqueId}@mail.ru`;
   
   const editedLastName = 'Sobirov';
-  // Имя после редактирования тоже делаем уникальным, чтобы при удалении не удалить чужого
+  // Имя после редактирования тоже делаем уникальным
   const editedFirstName = `Samir_${uniqueId}`;
 
   before(() => {
@@ -111,9 +111,11 @@ describe('Staff Management Flow', { pageLoadTimeout: 120000 }, () => {
       .should('be.visible')
       .focus()   
       .clear()
-      .type(staffLogin, { delay: 50 });
+      .type(staffLogin, { delay: 50 })
+      .blur(); // 🔥 ЗАСТАВЛЯЕМ ФОРМУ ПРОВЕРИТЬ ВАЛИДАЦИЮ
       
-    cy.get('.p-dialog-header').first().click({ force: true });
+    // Даем форме время "позеленеть" после валидации
+    cy.wait(1000);
 
     cy.contains('button', /Продолжить|Continue|Next/i, { timeout: 15000 })
       .scrollIntoView() 
@@ -125,20 +127,17 @@ describe('Staff Management Flow', { pageLoadTimeout: 120000 }, () => {
       .should('be.visible')
       .click({ force: true });
 
- // СБРОС ФОКУСА: Кликаем в пустоту модалки
-    cy.get('.p-dialog-header').first().click({ force: true });
+    // 🔥 ДАЕМ ВРЕМЯ VUE ЗАФИКСИРОВАТЬ ВЫБОР РОЛИ (Иначе кнопка не сработает)
     cy.wait(1500); 
 
-    // ✅ ВОЗВРАЩАЕМ { force: true } для обхода перекрытия маской (p-dialog-mask)
     cy.contains('button', /Создать|Create|Add/i, { timeout: 15000 })
       .scrollIntoView()
       .should('be.visible')
       .should('not.be.disabled') 
       .click({ force: true });
 
-    // 1. Убеждаемся, что модальное окно создания закрылось
     cy.get('.p-dialog', { timeout: 15000 }).should('not.exist');
-    cy.wait(2000);
+    cy.wait(2000); 
 
     // 🔍 ПОИСК: Ищем по УНИКАЛЬНОМУ ИМЕНИ (initialFirstName)
     cy.get('input[placeholder*="Поиск"], input[placeholder*="Search"]', { timeout: 10000 })
@@ -183,7 +182,8 @@ describe('Staff Management Flow', { pageLoadTimeout: 120000 }, () => {
       .scrollIntoView()
       .should('be.visible')
       .focus()
-      .type(`{selectall}{backspace}${editedFirstName}`, { delay: 100 });
+      .type(`{selectall}{backspace}${editedFirstName}`, { delay: 100 })
+      .blur(); // 🔥 Сбрасываем фокус перед сохранением
     
     cy.contains('button', /Сохранить|Save/i)
       .scrollIntoView()
@@ -225,7 +225,7 @@ describe('Staff Management Flow', { pageLoadTimeout: 120000 }, () => {
 
     cy.wait(2000);
 
-    cy.get('.p-datatable').should('not.contain', editedLastName);
+    cy.get('.p-datatable').should('not.contain', editedFirstName);
     
     cy.writeFile('auth_api_status.txt', '4');
     cy.log('🎉 ЦИКЛ ПОЛНОСТЬЮ ЗАВЕРШЕН!');
