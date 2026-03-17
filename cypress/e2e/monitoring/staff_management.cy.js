@@ -70,6 +70,11 @@ describe('Staff Management Flow', { pageLoadTimeout: 120000 }, () => {
     cy.writeFile('auth_api_status.txt', '1');
 
     cy.log('⚠️ Прямой переход в раздел Staff');
+    
+    // 🛑 СПАСЕНИЕ ОТ БЕЛОГО ЭКРАНА В CI:
+    // Даем приложению время сохранить токены в localStorage и инициализировать интерфейс. 
+    cy.wait(4000); 
+
     cy.visit('https://triple-test.netlify.app/flight/ru/staff', { timeout: 120000 });
     cy.url({ timeout: 20000 }).should('include', '/staff');
     
@@ -144,7 +149,11 @@ describe('Staff Management Flow', { pageLoadTimeout: 120000 }, () => {
 
     // Записываем 2 - Добавление успешно
     cy.writeFile('auth_api_status.txt', '2');
-cy.log('🟢 ШАГ 3: РЕДАКТИРОВАНИЕ СОТРУДНИКА');
+
+    // =========================================================
+    // ШАГ 3: РЕДАКТИРОВАНИЕ СОТРУДНИКА
+    // =========================================================
+    cy.log('🟢 ШАГ 3: РЕДАКТИРОВАНИЕ СОТРУДНИКА');
 
     cy.get('.p-datatable-tbody tr', { timeout: 20000 })
       .contains(`${initialLastName}`)
@@ -206,7 +215,6 @@ cy.log('🟢 ШАГ 3: РЕДАКТИРОВАНИЕ СОТРУДНИКА');
     cy.log('🟢 ШАГ 4: УДАЛЕНИЕ СОТРУДНИКА');
 
     // Поиск уже отфильтровал таблицу, поэтому сотрудник точно тут
-    // Заменил .p-row-odd на универсальный tr, чтобы не зависеть от четности/нечетности строки
     cy.get('.p-datatable-tbody tr')
       .contains(`${editedLastName}`)
       .scrollIntoView()
