@@ -83,7 +83,20 @@ describe('Staff Management Flow', { pageLoadTimeout: 120000 }, () => {
     cy.log('⚠️ Прямой переход в раздел Staff');
     cy.wait(4000); 
 
-    cy.visit('https://triple-test.netlify.app/flight/ru/staff', { timeout: 120000 });
+   cy.url({ timeout: 30000 }).should('not.include', '/sign-in');
+    cy.writeFile('auth_api_status.txt', '1');
+
+    cy.log('⚠️ Переход в раздел Staff через боковое меню');
+    
+    // Ждем появления сайдбара, чтобы убедиться, что дашборд прогрузился
+    cy.get('.sidebar-link', { timeout: 20000 }).should('be.visible');
+
+    // Кликаем по пункту "Сотрудники" (или Staff)
+    // Используем селектор из твоего скриншота
+    cy.contains('.sidebar-link', /Сотрудники|Staff/i)
+      .scrollIntoView()
+      .click();
+
     cy.url({ timeout: 20000 }).should('include', '/staff');
     
     cy.wait('@getStaffList', { timeout: 30000 }).then((interception) => {
@@ -94,18 +107,24 @@ describe('Staff Management Flow', { pageLoadTimeout: 120000 }, () => {
     // =========================================================
     // ШАГ 2: ДОБАВЛЕНИЕ СОТРУДНИКА
     // =========================================================
-    cy.log('🟢 ШАГ 2: ДОБАВЛЕНИЕ СОТРУДНИКА');
+cy.log('🟢 ШАГ 2: ДОБАВЛЕНИЕ СОТРУДНИКА');
 
     // Перехватываем POST запрос создания
     cy.intercept('POST', '**/api/staff*').as('apiCreateStaff');
 
-    cy.get('button', { timeout: 15000 })
-      .filter(':contains("Добавить"), :contains("Add")')
-      .first()
+    // 1. Ждем, пока исчезнет лоадер или появится заголовок "Список сотрудников"
+    // Это гарантирует, что страница не пустая (белый экран)
+    cy.contains('h3, h1, .page-header', /Список сотрудников|Staff List/i, { timeout: 30000 })
+      .should('be.visible');
+
+    // 2. Ищем кнопку более точечно. 
+    // На твоем сайте это часто кнопка с классом .app-button или внутри хедера таблицы
+    cy.get('button', { timeout: 20000 })
+      .contains(/Добавить|Add/i)
       .should('be.visible')
       .click({ force: true });
       
-    cy.wait(2500); // Ожидание анимации открытия модалки
+    cy.wait(2500);
 
     // 1. Явно снимаем фокус через .blur() после каждого ввода
     cy.get('input[placeholder="Supplier A"]').first().scrollIntoView().should('be.visible').focus().type(`{selectall}{backspace}${initialLastName}`, { delay: 50 }).blur();
