@@ -4,18 +4,17 @@ Cypress.on('uncaught:exception', (err, runnable) => {
 });
 
 describe('Staff Management Flow', { pageLoadTimeout: 120000 }, () => {
-  // Генерируем уникальную строку (буквы + цифры), чтобы сервер точно не ругался на формат
-  const uniqueId = Math.random().toString(36).substring(2, 8); 
+  // Только цифры, никаких спецсимволов и букв, чтобы точно пройти любую строгую валидацию
+  const uniqueId = Math.floor(Math.random() * 10000000); 
 
-  // Делаем данные 100% уникальными для каждого прогона
-  const initialFirstName = `Staff_${uniqueId}`; 
+  // УБРАЛИ ВСЕ ПОДЧЕРКИВАНИЯ из логина и email, чтобы фронтенд их не блокировал!
+  const initialFirstName = `Staff${uniqueId}`; 
   const initialLastName = 'TestStaff';
-  const staffLogin = `login_${uniqueId}`;
-  const staffEmail = `test_${uniqueId}@mail.ru`;
+  const staffLogin = `login${uniqueId}`;
+  const staffEmail = `test${uniqueId}@mail.ru`;
   
   const editedLastName = 'Sobirov';
-  // Имя после редактирования тоже делаем уникальным
-  const editedFirstName = `Samir_${uniqueId}`;
+  const editedFirstName = `Samir${uniqueId}`;
 
   before(() => {
     cy.writeFile('auth_api_status.txt', '0');
@@ -32,7 +31,6 @@ describe('Staff Management Flow', { pageLoadTimeout: 120000 }, () => {
     // =========================================================
     cy.log('🟢 ШАГ 1: НАЧАЛО АВТОРИЗАЦИИ');
 
-    // Очистка состояния перед стартом
     cy.clearCookies();
     cy.clearLocalStorage();
     cy.window().then((win) => {
@@ -75,7 +73,6 @@ describe('Staff Management Flow', { pageLoadTimeout: 120000 }, () => {
 
     cy.log('⚠️ Прямой переход в раздел Staff');
     
-    // Даем время на сохранение токенов
     cy.wait(4000); 
 
     cy.visit('https://triple-test.netlify.app/flight/ru/staff', { timeout: 120000 });
@@ -99,9 +96,10 @@ describe('Staff Management Flow', { pageLoadTimeout: 120000 }, () => {
       
     cy.wait(2500);
 
-    cy.get('input[placeholder="Supplier A"]', { timeout: 15000 }).first().scrollIntoView().should('be.visible').focus().clear().type(initialLastName, { delay: 50 });
-    cy.get('input[placeholder="Supplier A"]').last().scrollIntoView().should('be.visible').focus().clear().type(initialFirstName, { delay: 50 });
-    cy.get('input[placeholder="example@easybooking.com"]').scrollIntoView().should('be.visible').focus().clear().type(staffEmail, { delay: 50 });
+    // 🔥 ДОБАВЛЯЕМ .blur() НА КАЖДОЕ ПОЛЕ, чтобы форма принудительно проверила данные
+    cy.get('input[placeholder="Supplier A"]').first().scrollIntoView().should('be.visible').focus().clear().type(initialLastName, { delay: 50 }).blur();
+    cy.get('input[placeholder="Supplier A"]').last().scrollIntoView().should('be.visible').focus().clear().type(initialFirstName, { delay: 50 }).blur();
+    cy.get('input[placeholder="example@easybooking.com"]').scrollIntoView().should('be.visible').focus().clear().type(staffEmail, { delay: 50 }).blur();
 
     cy.contains(/Логин|Login/i, { timeout: 30000 })
       .parent() 
@@ -112,9 +110,8 @@ describe('Staff Management Flow', { pageLoadTimeout: 120000 }, () => {
       .focus()   
       .clear()
       .type(staffLogin, { delay: 50 })
-      .blur(); // 🔥 ЗАСТАВЛЯЕМ ФОРМУ ПРОВЕРИТЬ ВАЛИДАЦИЮ
+      .blur(); 
       
-    // Даем форме время "позеленеть" после валидации
     cy.wait(1000);
 
     cy.contains('button', /Продолжить|Continue|Next/i, { timeout: 15000 })
@@ -127,7 +124,6 @@ describe('Staff Management Flow', { pageLoadTimeout: 120000 }, () => {
       .should('be.visible')
       .click({ force: true });
 
-    // 🔥 ДАЕМ ВРЕМЯ VUE ЗАФИКСИРОВАТЬ ВЫБОР РОЛИ (Иначе кнопка не сработает)
     cy.wait(1500); 
 
     cy.contains('button', /Создать|Create|Add/i, { timeout: 15000 })
@@ -139,7 +135,6 @@ describe('Staff Management Flow', { pageLoadTimeout: 120000 }, () => {
     cy.get('.p-dialog', { timeout: 15000 }).should('not.exist');
     cy.wait(2000); 
 
-    // 🔍 ПОИСК: Ищем по УНИКАЛЬНОМУ ИМЕНИ (initialFirstName)
     cy.get('input[placeholder*="Поиск"], input[placeholder*="Search"]', { timeout: 10000 })
       .should('be.visible')
       .clear()
@@ -147,7 +142,6 @@ describe('Staff Management Flow', { pageLoadTimeout: 120000 }, () => {
 
     cy.wait(2000);
 
-    // Проверяем уникальное имя
     cy.get('.p-datatable-tbody', { timeout: 15000 }).should('contain', initialLastName);
     cy.writeFile('auth_api_status.txt', '2');
 
@@ -176,14 +170,13 @@ describe('Staff Management Flow', { pageLoadTimeout: 120000 }, () => {
       .scrollIntoView()
       .should('be.visible')
       .focus()
-      .type(`{selectall}{backspace}${editedLastName}`, { delay: 100 });
+      .type(`{selectall}{backspace}${editedLastName}`, { delay: 100 }).blur();
 
     cy.get('.p-dialog input[type="text"]').eq(1)
       .scrollIntoView()
       .should('be.visible')
       .focus()
-      .type(`{selectall}{backspace}${editedFirstName}`, { delay: 100 })
-      .blur(); // 🔥 Сбрасываем фокус перед сохранением
+      .type(`{selectall}{backspace}${editedFirstName}`, { delay: 100 }).blur();
     
     cy.contains('button', /Сохранить|Save/i)
       .scrollIntoView()
@@ -193,7 +186,6 @@ describe('Staff Management Flow', { pageLoadTimeout: 120000 }, () => {
     cy.get('.p-dialog', { timeout: 15000 }).should('not.exist');
     cy.wait(2000);
     
-    // 🔍 ПОИСК ПОСЛЕ РЕДАКТИРОВАНИЯ: Ищем по НОВОМУ УНИКАЛЬНОМУ ИМЕНИ (editedFirstName)
     cy.get('input[placeholder*="Поиск"], input[placeholder*="Search"]', { timeout: 10000 })
       .should('be.visible')
       .clear()
