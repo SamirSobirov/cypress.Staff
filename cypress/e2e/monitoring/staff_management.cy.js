@@ -131,10 +131,11 @@ describe('Staff Management Flow', { pageLoadTimeout: 120000 }, () => {
     cy.wait(1500); 
 
     // Кликаем "Создать" 
-    cy.contains('.app-button', /Создать|Create|Add/i, { timeout: 15000 })
-      .should('be.visible')
-      .should('not.be.disabled')
-      .click(); 
+ cy.get('.p-dialog', { timeout: 15000 })
+  .contains('.app-button', /Создать|Create/i)
+  .should('be.visible')
+  .should('not.be.disabled')
+  .click(); 
 
     cy.wait('@apiCreateStaff', { timeout: 20000 }).then((interception) => {
       expect(interception.response.statusCode).to.be.oneOf([200, 201]);
