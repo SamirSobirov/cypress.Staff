@@ -43,7 +43,7 @@ describe('Staff Management Flow', { pageLoadTimeout: 120000 }, () => {
     cy.clearLocalStorage();
     cy.window().then((win) => { win.sessionStorage.clear(); });
 
-    cy.visit('https://triple-test.netlify.app/sign-in', { timeout: 30000 });
+    cy.visit('https://dev.metatrip.uz/uz/sign-in', { timeout: 30000 });
     
     cy.get('input[type="text"]', { timeout: 15000 })
       .should('be.visible')
