@@ -14,12 +14,10 @@ const generateLetters = (len) => {
 describe('Staff Management Flow', { pageLoadTimeout: 120000 }, () => {
   const uniqueStr = generateLetters(6);
   const uniqueNum = Math.floor(Math.random() * 1000000);
-
   const initialFirstName = `Staff${uniqueStr}`; 
   const initialLastName = 'TestStaff';
   const staffLogin = `login${uniqueNum}`;
-  const staffEmail = `test${uniqueNum}@mail.ru`;
-  
+  const staffEmail = `test${uniqueNum}@mail.ru`;  
   const editedLastName = 'Sobirov';
   const editedFirstName = `Samir${uniqueStr}`;
 
@@ -29,7 +27,6 @@ describe('Staff Management Flow', { pageLoadTimeout: 120000 }, () => {
 
   it('Полный цикл: Авторизация -> Добавление -> Изменение -> Удаление', () => {
     cy.viewport(1280, 800);
-
     cy.intercept('POST', '**/login**').as('apiAuth');
     cy.intercept('GET', '**/staff*').as('getStaffList');
 
@@ -81,7 +78,6 @@ describe('Staff Management Flow', { pageLoadTimeout: 120000 }, () => {
       .click();
 
     cy.url({ timeout: 20000 }).should('include', '/staff');
-    
     cy.wait('@getStaffList', { timeout: 30000 });
 
     // =========================================================
@@ -91,24 +87,21 @@ describe('Staff Management Flow', { pageLoadTimeout: 120000 }, () => {
 
     cy.intercept('POST', '**/api/staff*').as('apiCreateStaff');
 
-    // Ждем появления заголовка или таблицы
     cy.contains(/Список сотрудников|Staff List/i, { timeout: 30000 }).should('be.visible');
 
     // Кнопка "Добавить"
     cy.get('button').contains(/Добавить|Add Staff/i).should('be.visible').click({ force: true });
     cy.wait(2000); 
 
-    // ОПРЕДЕЛЯЕМ ФУНКЦИЮ (она найдет input рядом с любым label)
     const fillField = (labelRegex, value) => {
       cy.contains('label', labelRegex)
-        .closest('div') // Ищем ближайший контейнер, где лежит и текст, и поле
+        .closest('div') 
         .find('input')
         .should('be.visible')
         .clear()
         .type(value, { delay: 50 });
     };
 
-    // ЗАПОЛНЯЕМ ВСЕ ПОЛЯ
     fillField(/Фамилия|Last Name/i, initialLastName);
     fillField(/Имя|First Name/i, initialFirstName);
     cy.get('input[placeholder*="example"]').scrollIntoView().should('be.visible').focus().type(`{selectall}{backspace}${staffEmail}`, { delay: 50 }).blur();
@@ -129,7 +122,6 @@ describe('Staff Management Flow', { pageLoadTimeout: 120000 }, () => {
     cy.contains('.role-card', /Оператор|Operator/i, { timeout: 10000 })
       .scrollIntoView()
       .click();
-
     cy.wait(1500); 
 
     cy.get('.p-dialog', { timeout: 15000 })
@@ -169,7 +161,6 @@ describe('Staff Management Flow', { pageLoadTimeout: 120000 }, () => {
     
     cy.contains('.p-tab', /Информация о пользователе|User Info/i, { timeout: 10000 })
       .click({ force: true });
-
     cy.wait(1000);
 
     cy.get('.p-dialog input[type="text"]').eq(0).type(`{selectall}{backspace}${editedLastName}`, { delay: 50 });
