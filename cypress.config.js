@@ -4,7 +4,7 @@ module.exports = defineConfig({
   chromeWebSecurity: false,
   
   e2e: {
-    baseUrl: 'https://dev.metatrip.uz',
+    baseUrl: 'https://stage.metatrip-system.uz',
     watchForFileChanges: false,
     viewportWidth: 1280,
     viewportHeight: 800,
