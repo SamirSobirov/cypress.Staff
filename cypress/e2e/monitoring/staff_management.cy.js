@@ -41,21 +41,24 @@ describe('Staff Management Flow', { pageLoadTimeout: 120000 }, () => {
 
     cy.visit('https://stage.metatrip-system.uz/sign-in', { timeout: 30000 });
     
-    cy.get('input[type="text"]', { timeout: 15000 })
-      .should('be.visible')
-      .focus()
-      .type(`{selectall}{backspace}${Cypress.env('LOGIN_EMAIL')}`, { delay: 50, log: false }); 
+    // ИСПРАВЛЕНО: Асинхронное получение переменных окружения
+    cy.env(['LOGIN_EMAIL', 'LOGIN_PASSWORD']).then((envVars) => {
+      cy.get('input[type="text"]', { timeout: 15000 })
+        .should('be.visible')
+        .focus()
+        .type(`{selectall}{backspace}${envVars.LOGIN_EMAIL}`, { delay: 50, log: false }); 
 
-    cy.get('input[type="password"]')
-      .should('be.visible')
-      .focus()
-      .type(`{selectall}{backspace}${Cypress.env('LOGIN_PASSWORD')}`, { delay: 50, log: false });
+      cy.get('input[type="password"]')
+        .should('be.visible')
+        .focus()
+        .type(`{selectall}{backspace}${envVars.LOGIN_PASSWORD}`, { delay: 50, log: false });
 
-    cy.wait(1000); 
+      cy.wait(1000); 
 
-    cy.get('button.sign-in-page__submit')
-      .should('be.visible')
-      .click({ force: true });
+      cy.get('button.sign-in-page__submit')
+        .should('be.visible')
+        .click({ force: true });
+    });
 
     cy.wait('@apiAuth', { timeout: 30000 }).then((interception) => {
       const statusCode = interception.response?.statusCode || 500;
@@ -171,6 +174,17 @@ describe('Staff Management Flow', { pageLoadTimeout: 120000 }, () => {
     cy.get('.p-dialog', { timeout: 15000 }).should('not.exist');
     cy.wait(2000);
     
+    // --- ИСПРАВЛЕНИЕ: ЗАКРЫТИЕ ПАНЕЛИ ---
+    cy.log('⚠️ Закрытие боковой панели сотрудника');
+    cy.get('button.p-drawer-close-button')
+      .should('be.visible')
+      .click({ force: true });
+
+    // Убеждаемся, что панель полностью исчезла со страницы перед продолжением
+    cy.get('.p-drawer', { timeout: 10000 }).should('not.exist');
+    cy.wait(1000);
+    // ------------------------------------
+
     cy.get('input[placeholder*="Поиск"], input[placeholder*="Search"]')
       .should('be.visible')
       .clear()
