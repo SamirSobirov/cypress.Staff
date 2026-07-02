@@ -15,11 +15,11 @@ describe('Staff Management Flow', { pageLoadTimeout: 120000 }, () => {
   const uniqueStr = generateLetters(6);
   const uniqueNum = Math.floor(Math.random() * 1000000);
   const initialFirstName = `Staff${uniqueStr}`; 
-  const initialLastName = 'TestStaff';
+  const initialLastName = 'TESTSTAFF';
   const staffLogin = `login${uniqueNum}`;
   const staffEmail = `test${uniqueNum}@mail.ru`;  
-  const editedLastName = 'Sobirov';
-  const editedFirstName = `Samir${uniqueStr}`;
+  const editedLastName = 'SOBIROV';
+  const editedFirstName = `SAMIR${uniqueStr}`;
 
   before(() => {
     cy.writeFile('auth_api_status.txt', '0');
