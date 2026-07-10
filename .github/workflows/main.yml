@@ -1,87 +1,87 @@
-name: Staff Management 
+# name: Staff Management 
 
-on:
-  schedule:
-    - cron: '0 */2 * * *' 
-  workflow_dispatch:
-    inputs:
-      user_chat_id:
-        description: 'ID чата для личного ответа'
-        required: false
-        default: ''
+# on:
+#   schedule:
+#     - cron: '0 */2 * * *' 
+#   workflow_dispatch:
+#     inputs:
+#       user_chat_id:
+#         description: 'ID чата для личного ответа'
+#         required: false
+#         default: ''
 
-jobs:
-  cypress-run:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+# jobs:
+#   cypress-run:
+#     runs-on: ubuntu-latest
+#     steps:
+#       - name: Checkout
+#         uses: actions/checkout@v4
 
-      - name: Cypress run
-        uses: cypress-io/github-action@v6
-        with:
-          spec: cypress/e2e/monitoring/staff_management.cy.js 
-          browser: chrome
-        env:
-          CYPRESS_LOGIN_EMAIL: ${{ secrets.LOGIN_EMAIL }}
-          CYPRESS_LOGIN_PASSWORD: ${{ secrets.LOGIN_PASSWORD }}
-        continue-on-error: true
+#       - name: Cypress run
+#         uses: cypress-io/github-action@v6
+#         with:
+#           spec: cypress/e2e/monitoring/staff_management.cy.js 
+#           browser: chrome
+#         env:
+#           CYPRESS_LOGIN_EMAIL: ${{ secrets.LOGIN_EMAIL }}
+#           CYPRESS_LOGIN_PASSWORD: ${{ secrets.LOGIN_PASSWORD }}
+#         continue-on-error: true
 
-      - name: Parse Diagnostic Data
-        if: always()
-        run: |
-          if [ -f auth_api_status.txt ]; then
-            RESULT=$(cat auth_api_status.txt | tr -d '[:space:]')
-          else
-            RESULT="UNKNOWN"
-          fi
+#       - name: Parse Diagnostic Data
+#         if: always()
+#         run: |
+#           if [ -f auth_api_status.txt ]; then
+#             RESULT=$(cat auth_api_status.txt | tr -d '[:space:]')
+#           else
+#             RESULT="UNKNOWN"
+#           fi
 
-          S1="⏳"; S2="⏳"; S3="⏳"; S4="⏳"; STATUS="🔴 Failed"
+#           S1="⏳"; S2="⏳"; S3="⏳"; S4="⏳"; STATUS="🔴 Failed"
 
-          case "$RESULT" in
-            "0") S1="❌"; STATUS="❌ UI Crash at Auth" ;;
-            "1") S1="✅"; S2="❌"; STATUS="⚠️ Failed at Create" ;;
-            "2") S1="✅"; S2="✅"; S3="❌"; STATUS="⚠️ Failed at Edit" ;;
-            "3") S1="✅"; S2="✅"; S3="✅"; S4="❌"; STATUS="⚠️ Failed at Delete" ;;
-            "4") S1="✅"; S2="✅"; S3="✅"; S4="✅"; STATUS="🟢 Success" ;;
-            ERROR_*) S1="🆘 ${RESULT}"; STATUS="🔴 Auth API Error" ;;
-            *) STATUS="❌ Unknown Failure / File Missing" ;;
-          esac
+#           case "$RESULT" in
+#             "0") S1="❌"; STATUS="❌ UI Crash at Auth" ;;
+#             "1") S1="✅"; S2="❌"; STATUS="⚠️ Failed at Create" ;;
+#             "2") S1="✅"; S2="✅"; S3="❌"; STATUS="⚠️ Failed at Edit" ;;
+#             "3") S1="✅"; S2="✅"; S3="✅"; S4="❌"; STATUS="⚠️ Failed at Delete" ;;
+#             "4") S1="✅"; S2="✅"; S3="✅"; S4="✅"; STATUS="🟢 Success" ;;
+#             ERROR_*) S1="🆘 ${RESULT}"; STATUS="🔴 Auth API Error" ;;
+#             *) STATUS="❌ Unknown Failure / File Missing" ;;
+#           esac
 
-          echo "S1=$S1" >> $GITHUB_ENV
-          echo "S2=$S2" >> $GITHUB_ENV
-          echo "S3=$S3" >> $GITHUB_ENV
-          echo "S4=$S4" >> $GITHUB_ENV
-          echo "FINAL_STATUS=$STATUS" >> $GITHUB_ENV
+#           echo "S1=$S1" >> $GITHUB_ENV
+#           echo "S2=$S2" >> $GITHUB_ENV
+#           echo "S3=$S3" >> $GITHUB_ENV
+#           echo "S4=$S4" >> $GITHUB_ENV
+#           echo "FINAL_STATUS=$STATUS" >> $GITHUB_ENV
 
-      - name: Upload Cypress Screenshots & Videos
-        uses: actions/upload-artifact@v4
-        if: failure() || always()
-        with:
-          name: cypress-artifacts
-          path: |
-            cypress/screenshots/
-            cypress/videos/
-          if-no-files-found: ignore
+#       - name: Upload Cypress Screenshots & Videos
+#         uses: actions/upload-artifact@v4
+#         if: failure() || always()
+#         with:
+#           name: cypress-artifacts
+#           path: |
+#             cypress/screenshots/
+#             cypress/videos/
+#           if-no-files-found: ignore
 
-      - name: Send Telegram Notification
-        if: always()
-        uses: appleboy/telegram-action@master
-        with:
-          to: >-
-            ${{ (github.event.inputs.user_chat_id != '') && 
-            github.event.inputs.user_chat_id || 
-            secrets.TELEGRAM_CHAT_ID }}
-          token: ${{ secrets.TELEGRAM_TOKEN }} 
-          format: markdown
-          message: |
-            ${{ github.event_name == 'schedule' && '📢 **Hourly Monitoring**' || '👤 **Manual Testing**' }}
+#       - name: Send Telegram Notification
+#         if: always()
+#         uses: appleboy/telegram-action@master
+#         with:
+#           to: >-
+#             ${{ (github.event.inputs.user_chat_id != '') && 
+#             github.event.inputs.user_chat_id || 
+#             secrets.TELEGRAM_CHAT_ID }}
+#           token: ${{ secrets.TELEGRAM_TOKEN }} 
+#           format: markdown
+#           message: |
+#             ${{ github.event_name == 'schedule' && '📢 **Hourly Monitoring**' || '👤 **Manual Testing**' }}
             
-            📂 **Module:** Staff Management
-            📊 **Status:** ${{ env.FINAL_STATUS }}
+#             📂 **Module:** Staff Management
+#             📊 **Status:** ${{ env.FINAL_STATUS }}
 
-            **Flow Steps:**
-            1. Auth: ${{ env.S1 }}
-            2. Create: ${{ env.S2 }}
-            3. Edit: ${{ env.S3 }}
-            4. Delete: ${{ env.S4 }}
+#             **Flow Steps:**
+#             1. Auth: ${{ env.S1 }}
+#             2. Create: ${{ env.S2 }}
+#             3. Edit: ${{ env.S3 }}
+#             4. Delete: ${{ env.S4 }}
